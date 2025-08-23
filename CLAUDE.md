@@ -7,17 +7,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a robust web application specifically designed to extract complete profile data from rip.fun user pages. The app fetches HTML from rip.fun profiles with enhanced reliability features, parses the SvelteKit data structure from JavaScript code, automatically removes clip_embedding data to reduce payload size, and provides clean JSON output with comprehensive visualization of profile information, digital cards, packs, and collection statistics.
 
 ### Recent Major Enhancements (2025)
+- **Advanced Card Management**: Set-based filtering, duplicate management, and dual view modes (grid/table)
+- **Smart Set Recognition**: Automatic parsing of set names from API data with proper fallback handling
 - **Intelligent Pack Grouping**: Automatic categorization of packs by name with toggleable detailed views
 - **Pack Status Tracking**: Visual summaries showing opened, sealed, and pending open counts  
 - **Enhanced Reliability**: Retry logic with exponential backoff and progressive timeouts (20s-60s)
 - **Improved UX**: Real-time progress updates, detailed error messages, and responsive design
-- **Advanced Data Visualization**: Expandable pack groups with comprehensive status tables
+- **Advanced Data Visualization**: Expandable pack groups, card filtering, and comprehensive status tables
 
 ## Architecture
 
 ### Core Components
 
-- **Frontend**: Enhanced user interface with intelligent pack grouping, status tracking, and real-time progress updates
+- **Frontend**: Enhanced user interface with advanced card filtering, set-based organization, dual view modes, intelligent pack grouping, status tracking, and real-time progress updates
 - **Backend API**: Robust rip.fun HTML fetching with retry logic, SvelteKit data parsing, and extraction logic
 - **Enhanced Fetcher Service**: Automatic retry with exponential backoff, progressive timeouts, and smart error handling
 - **Data Processing Pipeline**: 
@@ -26,7 +28,7 @@ This is a robust web application specifically designed to extract complete profi
   3. Automatic removal of clip_embedding data from digital_cards and cards arrays
   4. Data sanitization and structure preservation with pack status analysis
   5. JSON export with complete profile, cards, packs, and statistics data
-- **Data Visualization Engine**: Pack grouping logic, status summarization, and interactive table display
+- **Data Visualization Engine**: Advanced card filtering, set-based organization, duplicate management, pack grouping logic, status summarization, and interactive dual-view displays
 
 ### Key Workflows
 
@@ -39,10 +41,14 @@ This is a robust web application specifically designed to extract complete profi
    - Groups packs by name/type for organized display
    - Calculates opened, sealed, and pending open counts
    - Preserves all relevant data while removing clip_embedding bloat
-4. **Advanced Visualization**: Interactive display with grouped pack management
-   - Collapsible pack groups with summary statistics
-   - Individual pack tables with ID and status columns
-   - Color-coded status indicators and value tracking
+4. **Advanced Visualization**: Interactive display with comprehensive card and pack management
+   - **Card Filtering**: Set-based filtering with dropdown selection and card count display
+   - **Duplicate Management**: Toggle to show/hide duplicate cards with visual count indicators  
+   - **Dual View Modes**: Grid view for visual browsing and table view for detailed data analysis
+   - **Smart Set Recognition**: Automatic parsing of set names from API data (e.g., "151", "Prismatic Evolutions")
+   - **Collapsible Pack Groups**: Summary statistics with expandable detailed views
+   - **Interactive Tables**: Pack status tables with ID and status columns
+   - **Visual Indicators**: Color-coded status badges, duplicate count badges, and value tracking
 5. **Data Export**: Provides complete JSON output with profile, cards, packs, and statistics
 
 ## Security Considerations
@@ -66,6 +72,16 @@ This is a robust web application specifically designed to extract complete profi
 - Flatten nested objects to key-value pairs
 - Deduplicate arrays and strip empty values
 - Handle field mapping between rip.fun data structure and profile schema
+
+### Advanced Card Filtering and Display System
+- **Set-Based Organization**: Automatically group cards by Pokemon TCG sets using API-provided set data
+- **Smart Set Name Parsing**: Extract human-readable set names from `card.set.name` field (e.g., "151", "Prismatic Evolutions", "Black Bolt")
+- **Duplicate Management**: Intelligent deduplication with visual count indicators for identical cards
+- **Dual View Modes**: 
+  - **Grid View**: Visual card layout with images, stats, and duplicate count badges
+  - **Table View**: Comprehensive data table with sortable columns (name, set, rarity, type, HP, value, status)
+- **Dynamic Filtering**: Real-time filter updates with card count display for each set
+- **Fallback Handling**: Graceful degradation to set_id display when set names are unavailable
 
 ### Pack Grouping and Status Analysis
 - Group digital_products by name to consolidate similar pack types
@@ -112,9 +128,11 @@ npm run check              # Type checking
 1. **Enhanced HTML Fetching**: Reliable retrieval with retry logic and progressive timeouts ✓
 2. **SvelteKit Parser**: Advanced extraction and parsing of JSON script blocks ✓ 
 3. **Data Cleaning**: Comprehensive normalization and field mapping logic ✓
-4. **Pack Grouping System**: Intelligent categorization with status tracking ✓
-5. **Advanced Frontend Interface**: Interactive tables, expandable groups, real-time progress ✓
-6. **Error Handling**: User-friendly messages with troubleshooting guidance ✓
+4. **Advanced Card Management**: Set-based filtering, duplicate handling, grid/table views ✓
+5. **Smart Set Recognition**: Automatic parsing of human-readable set names from API data ✓
+6. **Pack Grouping System**: Intelligent categorization with status tracking ✓
+7. **Advanced Frontend Interface**: Interactive filtering, dual view modes, expandable groups, real-time progress ✓
+8. **Error Handling**: User-friendly messages with troubleshooting guidance ✓
 
 ### 🚧 Current Architecture (Fully Implemented)
 - **Primary Focus**: rip.fun data extraction and visualization
@@ -131,6 +149,9 @@ npm run check              # Type checking
 
 ### 🎯 Key Technical Achievements
 - **Zero timeout failures** with enhanced retry logic
+- **Advanced card filtering** with set-based organization and duplicate management
+- **Intelligent data parsing** with proper set name extraction from API responses
+- **Dual view modes** providing both visual and analytical perspectives
 - **Intuitive pack management** with grouped displays and status summaries
 - **Real-time user feedback** during long-running operations
 - **Comprehensive error handling** with actionable guidance

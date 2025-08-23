@@ -61,82 +61,185 @@ export function extractSvelteKitData(html: string): ExtractedData {
 
 function extractRipFunData(scriptContent: string): ExtractedData {
   try {
-    // Look for the kit.start() function call and extract the complete data array
-    const kitStartMatch = scriptContent.match(/kit\.start\([^,]+,\s*[^,]+,\s*\{[^}]*data:\s*(\[.*?\])/s);
-    
-    if (kitStartMatch) {
+    // Use the developer's improved regex that correctly identifies the data array boundary
+    // The key fix: look for "data: [...], form:" instead of other patterns
+    const dataRegex = /data:\s*(\[[\s\S]*?\]),\s*form:/;
+    const match = scriptContent.match(dataRegex);
+
+    if (match && match[1]) {
+      let dataString = match[1];
+      
+      // Clean the string to make it parsable by replacing new Date() calls
+      const cleanedString = dataString.replace(/new Date\(([^)]+)\)/g, '$1');
+      
       try {
-        // Extract the data array string - this is still JavaScript, not JSON
-        // We need to find a way to safely convert it to JSON
+        // Use Function constructor (safer than eval) to parse the cleaned string
+        const dataArray = new Function(`return ${cleanedString}`)();
         
-        // Try to find the closing bracket for the data array by counting brackets
-        let bracketCount = 0;
-        let endIndex = 0;
+        // The main profile data is in the second element of the array (index 1)
+        const profileData = dataArray[1]?.data?.profile;
         
-        for (let i = 0; i < scriptContent.length; i++) {
-          const char = scriptContent[i];
-          if (char === '[') bracketCount++;
-          if (char === ']') bracketCount--;
-          if (bracketCount === 0 && char === ']') {
-            endIndex = i;
-            break;
-          }
-        }
-        
-        // Find the start of the data array
-        const dataStartIndex = scriptContent.indexOf(kitStartMatch[1]);
-        if (dataStartIndex !== -1 && endIndex > dataStartIndex) {
-          // Extract the complete data array
-          const fullDataStr = scriptContent.substring(dataStartIndex, endIndex + 1);
+        if (profileData) {
+          // Create deep copies to avoid modifying the original data
+          const digital_products = JSON.parse(JSON.stringify(profileData.digital_products || []));
+          const digital_cards = JSON.parse(JSON.stringify(profileData.digital_cards || []));
           
-          // This is the most robust approach - try to convert JavaScript object notation to JSON
-          // by replacing JavaScript-specific syntax with JSON equivalents
-          let jsonStr = fullDataStr
-            .replace(/new Date\((\d+)\)/g, '"$1"') // Replace new Date() with timestamp strings
-            .replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*):/g, '$1"$2":') // Quote object keys
-            .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
-            .replace(/\bclip_embedding:\[[\d\s,.\-]*\]/g, '"clip_embedding":"REMOVED"'); // Replace clip_embedding arrays
-          
-          try {
-            const parsedData = JSON.parse(jsonStr);
-            
-            // Extract the complete data structure
-            if (Array.isArray(parsedData)) {
-              const extractedData: ExtractedData = {};
-              
-              parsedData.forEach((item: any) => {
-                if (item && item.data) {
-                  // Merge all data from each item
-                  Object.assign(extractedData, item.data);
-                }
-              });
-              
-              return extractedData;
+          // Remove clip_embedding fields from digital_cards
+          digital_cards.forEach((item: any) => {
+            if (item.card && 'clip_embedding' in item.card) {
+              delete item.card.clip_embedding;
             }
-          } catch (jsonError) {
-            console.warn('Failed to parse as JSON, falling back to regex extraction:', jsonError);
+          });
+          
+          // Also check products for the same field
+          digital_products.forEach((item: any) => {
+            if (item.product && 'clip_embedding' in item.product) {
+              delete item.product.clip_embedding;
+            }
+          });
+          
+          // Structure the profile data
+          const profile = {
+            ...profileData,
+            digital_products,
+            digital_cards
+          };
+          
+          const extractedData: ExtractedData = { profile };
+          
+          // Also add stats if available
+          if (dataArray[1]?.data?.stats) {
+            extractedData.stats = dataArray[1].data.stats;
+          }
+          
+          console.log(`Extracted ${digital_cards.length} cards using improved regex method`);
+          return extractedData;
+        } else {
+          console.warn('Profile data could not be located in the parsed object');
+        }
+        
+      } catch (parseError) {
+        console.warn('Failed to parse data array with improved method:', parseError);
+      }
+    } else {
+      console.warn('Could not find the data array using improved regex - data structure may have changed');
+    }
+
+    // Fallback to previous extraction methods
+    console.log('Using fallback extraction methods');
+    return extractFromDataArray(scriptContent);
+    
+  } catch (error) {
+    console.warn('Failed to extract rip.fun data with improved method:', error);
+    return extractRipFunDataFallback(scriptContent);
+  }
+}
+
+function extractFromDataArray(scriptContent: string): ExtractedData {
+  try {
+    // Look for dataArray[1].data.profile pattern
+    const dataArrayStart = scriptContent.indexOf('data: [');
+    if (dataArrayStart === -1) return {};
+    
+    // Find the second object in the data array (dataArray[1])
+    let bracketCount = 0;
+    let objectCount = 0;
+    let start = -1;
+    let end = -1;
+    
+    for (let i = dataArrayStart + 7; i < scriptContent.length; i++) {
+      const char = scriptContent[i];
+      
+      if (char === '{') {
+        if (bracketCount === 0) {
+          objectCount++;
+          if (objectCount === 2) { // Second object (index 1)
+            start = i;
           }
         }
-      } catch (extractError) {
-        console.warn('Failed to extract data array:', extractError);
+        bracketCount++;
+      } else if (char === '}') {
+        bracketCount--;
+        if (bracketCount === 0 && objectCount === 2) {
+          end = i;
+          break;
+        }
       }
     }
     
-    // Fallback to regex extraction for key fields if JSON parsing fails
-    return extractRipFunDataFallback(scriptContent);
+    if (start !== -1 && end !== -1) {
+      let objectStr = scriptContent.substring(start, end + 1);
+      
+      // Clean JavaScript notation
+      objectStr = objectStr
+        .replace(/new Date\(([^)]+)\)/g, '$1')
+        .replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":')
+        .replace(/,\s*([}\]])/g, '$1')
+        .replace(/\bundefined\b/g, 'null');
+      
+      try {
+        const parsedObject = JSON.parse(objectStr);
+        
+        if (parsedObject.data?.profile) {
+          const extractedData: ExtractedData = {
+            profile: parsedObject.data.profile
+          };
+          
+          // Clean clip_embedding data
+          if (extractedData.profile.digital_cards && Array.isArray(extractedData.profile.digital_cards)) {
+            extractedData.profile.digital_cards.forEach((item: any) => {
+              if (item.card?.clip_embedding) {
+                delete item.card.clip_embedding;
+              }
+            });
+          }
+          
+          console.log(`Extracted ${extractedData.profile.digital_cards?.length || 0} cards from data array`);
+          return extractedData;
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse data array object:', parseError);
+      }
+    }
     
   } catch (error) {
-    console.warn('Failed to extract rip.fun data:', error);
-    return {};
+    console.warn('Failed to extract from data array:', error);
   }
+  
+  return {};
 }
 
 function extractRipFunDataFallback(scriptContent: string): ExtractedData {
   const extractedData: ExtractedData = {};
   
   try {
-    // First try to extract the complete profile object with more complex regex
-    const fullProfileMatch = scriptContent.match(/profile:\s*\{[\s\S]*?digital_cards:\s*\[[\s\S]*?\][\s\S]*?\}/);
+    // Find the profile start and extract by counting braces
+    const profileStartMatch = scriptContent.match(/profile:\s*\{/);
+    
+    let fullProfileMatch = null;
+    if (profileStartMatch) {
+      const startIndex = scriptContent.indexOf(profileStartMatch[0]);
+      const openBraceIndex = startIndex + profileStartMatch[0].length - 1;
+      
+      let braceCount = 1;
+      let endIndex = openBraceIndex;
+      
+      for (let i = openBraceIndex + 1; i < scriptContent.length; i++) {
+        const char = scriptContent[i];
+        if (char === '{') braceCount++;
+        else if (char === '}') braceCount--;
+        
+        if (braceCount === 0) {
+          endIndex = i;
+          break;
+        }
+      }
+      
+      if (endIndex > openBraceIndex) {
+        const profileText = scriptContent.substring(startIndex, endIndex + 1);
+        fullProfileMatch = [profileText];
+      }
+    }
     
     if (fullProfileMatch) {
       const profileText = fullProfileMatch[0];
@@ -174,9 +277,28 @@ function extractRipFunDataFallback(scriptContent: string): ExtractedData {
         }
       }
       
-      // Try to extract digital_cards array
-      const cardsMatch = profileText.match(/digital_cards:\s*\[([\s\S]*?)\]/);
-      if (cardsMatch) {
+      // Try to extract digital_cards array using bracket counting for complete extraction
+      const cardsStartMatch = profileText.match(/digital_cards:\s*\[/);
+      if (cardsStartMatch) {
+        const cardsStartIndex = profileText.indexOf(cardsStartMatch[0]) + cardsStartMatch[0].length - 1; // -1 to include opening bracket
+        
+        // Count brackets to find the complete digital_cards array
+        let bracketCount = 1;
+        let cardsEndIndex = cardsStartIndex;
+        
+        for (let i = cardsStartIndex + 1; i < profileText.length; i++) {
+          const char = profileText[i];
+          if (char === '[') bracketCount++;
+          else if (char === ']') bracketCount--;
+          
+          if (bracketCount === 0) {
+            cardsEndIndex = i;
+            break;
+          }
+        }
+        
+        const cardsFullText = profileText.substring(cardsStartIndex + 1, cardsEndIndex); // +1 to skip opening bracket
+        const cardsMatch = [null, cardsFullText]; // Mimic the regex match structure
         try {
           // Count card objects by counting balanced braces
           const cardsText = cardsMatch[1];
@@ -435,4 +557,114 @@ export function sanitizeExtractedData(data: ExtractedData): ExtractedData {
   }
   
   return sanitized;
+}
+
+/**
+ * Extract user data directly from rip.fun owned-cards API endpoint.
+ * Input should be a user ID (e.g., "2010" for ndw).
+ */
+export async function extractFromRipFunAPI(userId: string): Promise<ExtractedData> {
+  try {
+    console.log(`Starting API extraction for user ID: ${userId}`);
+    
+    // Get complete card collection using user ID
+    const cardsUrl = `https://www.rip.fun/api/user/${userId}/owned-cards`;
+    console.log(`Fetching owned cards from: ${cardsUrl}`);
+    
+    const cardsResponse = await fetch(cardsUrl);
+    if (!cardsResponse.ok) {
+      if (cardsResponse.status === 404) {
+        throw new Error(`User ID '${userId}' not found`);
+      }
+      throw new Error(`Failed to get owned cards: ${cardsResponse.status} ${cardsResponse.statusText}`);
+    }
+    
+    const cardsData = await cardsResponse.json();
+    
+    if (!cardsData.cards || !Array.isArray(cardsData.cards)) {
+      throw new Error('Invalid cards data structure received from API');
+    }
+    
+    const allCards = cardsData.cards;
+    console.log(`Successfully fetched ${allCards.length} total cards from API`);
+    
+    // Clean and transform API data, removing clip_embedding
+    const transformedCards = allCards.map((cardData: any) => {
+      // Remove clip_embedding from card data to prevent huge payloads
+      const cleanCard = { ...cardData.card };
+      if (cleanCard.clip_embedding) {
+        delete cleanCard.clip_embedding;
+      }
+      
+      return {
+        id: cardData.token_id, // Use token_id as the main ID
+        token_id: cardData.token_id,
+        unique_id: cardData.unique_id,
+        is_listed: cardData.is_listed || false,
+        front_image_url: cardData.front_image_url,
+        owner: cardData.owner,
+        card: {
+          id: cleanCard.id,
+          name: cleanCard.name || 'Unknown Card',
+          card_number: cleanCard.card_number || cleanCard.formatted_card_number?.toString() || '',
+          rarity: cleanCard.rarity || '',
+          hp: cleanCard.hp,
+          types: cleanCard.types || [],
+          abilities: cleanCard.abilities || [],
+          attacks: cleanCard.attacks || [],
+          weaknesses: cleanCard.weaknesses || [],
+          resistances: cleanCard.resistances || [],
+          raw_price: cleanCard.raw_price || 0,
+          set_id: cleanCard.set_id || '',
+          large_image_url: cleanCard.large_image_url,
+          small_image_url: cleanCard.small_image_url,
+          supertype: cleanCard.supertype,
+          subtype: cleanCard.subtype,
+          illustrator: cleanCard.illustrator,
+          tcgplayer_id: cleanCard.tcgplayer_id,
+          is_chase: cleanCard.is_chase,
+          is_reverse: cleanCard.is_reverse,
+          is_holo: cleanCard.is_holo,
+          sku: cleanCard.sku,
+          created_at: cleanCard.created_at,
+          updated_at: cleanCard.updated_at
+        },
+        set: cleanCard.set || {
+          id: cleanCard.set_id,
+          name: 'Unknown Set'
+        },
+        listing: cardData.listing
+      };
+    });
+    
+    // Create comprehensive profile structure
+    const profile = {
+      id: userId,
+      username: `User ${userId}`, // We don't get username from this endpoint
+      digital_cards: transformedCards,
+      digital_products: [], // This endpoint doesn't provide pack info
+      total_cards: transformedCards.length,
+      total_packs: 0,
+      total_value: transformedCards.reduce((sum: number, card: any) => sum + parseFloat(card.card?.raw_price || 0), 0).toFixed(2)
+    };
+    
+    const stats = {
+      totalCards: transformedCards.length,
+      totalPacks: 0,
+      totalValue: `$${profile.total_value}`
+    };
+    
+    console.log(`API extraction complete: ${transformedCards.length} cards, total value $${profile.total_value}`);
+    
+    return {
+      profile,
+      stats,
+      extraction_method: 'api_direct',
+      api_calls_made: 1
+    };
+    
+  } catch (error) {
+    console.error('Failed to extract data from rip.fun API:', error);
+    throw new Error(`API extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }

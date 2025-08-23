@@ -1,6 +1,6 @@
 # rip.fun Data Extractor
 
-A robust web application specifically designed to extract complete profile data from rip.fun user pages. The app fetches HTML from rip.fun profiles, parses the SvelteKit data structure, automatically removes clip_embedding data to reduce payload size, and provides clean JSON output with all profile information, cards, packs, and statistics.
+A robust web application specifically designed to extract complete profile data from rip.fun user pages. The app fetches HTML from rip.fun profiles, parses the SvelteKit data structure, automatically removes clip_embedding data to reduce payload size, and provides clean JSON output with advanced card filtering, set-based organization, and comprehensive visualization of profile information, digital cards, packs, and statistics.
 
 ## ✨ Key Features
 
@@ -19,11 +19,16 @@ A robust web application specifically designed to extract complete profile data 
 - **JSON Export**: Download clean data as JSON files or copy to clipboard
 - **Responsive Design**: Clean interface optimized for all device sizes
 
-### Data Visualization
+### Advanced Card Management & Visualization
+- **Set-Based Card Filtering**: Organize and filter cards by Pokemon TCG sets with real-time count updates
+- **Smart Set Recognition**: Automatic parsing of human-readable set names (e.g., "151", "Prismatic Evolutions", "Black Bolt")
+- **Duplicate Management**: Toggle to show/hide duplicate cards with visual count badges
+- **Dual View Modes**: Switch between grid view (visual browsing) and table view (detailed analysis)
+- **Interactive Card Tables**: Sortable columns including name, set, rarity, type, HP, value, and status
 - **Organized Pack Display**: Table view with ID and status columns for each pack group
 - **Collection Analytics**: Set-by-set breakdowns with rarity distribution and value tracking
 - **Status Indicators**: Color-coded badges for listing status, pack conditions, and ownership
-- **Interactive Tables**: Expandable pack groups with detailed summaries and individual item listings
+- **Visual Count Badges**: Blue badges showing duplicate card counts and item quantities
 
 ## Tech Stack
 
@@ -61,10 +66,25 @@ npm run dev
    - Monitor real-time progress updates during extraction
    - Automatic retries handle temporary timeouts or network issues
 4. **Review Results**: Explore the comprehensive data visualization:
+   - **Card Management**: Use set-based filtering to organize cards by Pokemon TCG sets
+     - Filter dropdown shows all available sets with card counts
+     - Toggle duplicate display to see unique cards or full collection
+     - Switch between grid view (visual) and table view (analytical)
    - **Pack Groups**: Click any pack category to expand and see individual pack details
    - **Status Summary**: View opened/sealed/pending counts at the top of each pack group
    - **Collection Overview**: Browse set statistics, card rarities, and total values
 5. **Export Data**: Download as JSON file or copy to clipboard for external use
+
+### 🃏 Card Management Features
+
+- **Set-Based Organization**: Cards automatically grouped by Pokemon TCG sets (e.g., "151", "Prismatic Evolutions", "Black Bolt")
+- **Smart Filtering**: Dropdown filter with real-time card counts for each set
+- **Duplicate Handling**: Toggle to show all cards or deduplicate with visual count indicators
+- **Dual Display Modes**:
+  - **Grid View**: Visual card browser with images, stats, and duplicate badges
+  - **Table View**: Comprehensive data table with sortable columns (name, set, rarity, type, HP, value, status)
+- **Visual Indicators**: Blue count badges for duplicates, color-coded status indicators for listings
+- **Responsive Design**: Optimized layouts for both desktop and mobile viewing
 
 ### 🎯 Pack Management Features
 
@@ -89,14 +109,16 @@ The application extracts and displays comprehensive data from rip.fun profiles:
 - `verified` - Verification status
 - Account creation and update timestamps
 
-**Digital Cards (Complete Details):**
-- Individual card information including name, card number, rarity, HP
-- Card types, abilities, attacks, weaknesses, resistances
-- Market values and listing prices
-- Card images and artwork
-- Set information with release dates
-- Listing status and marketplace data
-- Cards organized by set with statistics
+**Digital Cards (Advanced Management):**
+- **Set-Based Organization**: Cards automatically grouped by Pokemon TCG sets with human-readable names
+- **Filtering System**: Dropdown filter to show all sets or specific set collections
+- **Duplicate Management**: Smart deduplication with visual count badges for identical cards
+- **Dual View Modes**: Grid view for visual browsing, table view for detailed analysis
+- **Complete Card Details**: Name, card number, rarity, HP, types, abilities, attacks, weaknesses, resistances
+- **Market Data**: Values, listing prices, and marketplace status
+- **Visual Assets**: Card images, artwork, and set symbols
+- **Set Information**: Release dates, set statistics, and rarity distributions
+- **Interactive Tables**: Sortable columns with comprehensive card data
 
 **Digital Products & Packs (Enhanced Display):**
 - **Grouped Pack View**: Packs automatically organized by name/type

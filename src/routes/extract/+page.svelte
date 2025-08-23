@@ -1,15 +1,20 @@
 <script lang="ts">
-  let ripUsername = $state('');
+  let ripUserId = $state('');
   let extractedData = $state<any>(null);
   let loading = $state(false);
   let error = $state('');
   let extractionInfo = $state<any>(null);
   let retryAttempt = $state(0);
   let loadingMessage = $state('Starting extraction...');
+  
+  // Cards display state
+  let selectedSet = $state('all');
+  let viewMode = $state<'grid' | 'table'>('grid');
+  let showDuplicates = $state(true);
 
   async function runExtraction() {
-    if (!ripUsername.trim()) {
-      error = 'Please enter a rip.fun username';
+    if (!ripUserId.trim()) {
+      error = 'Please enter a rip.fun user ID';
       return;
     }
 
@@ -43,7 +48,8 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: ripUsername.trim(),
+          username: ripUserId.trim(),
+          method: 'api'
         }),
       });
 
@@ -67,7 +73,7 @@
       if (errorMsg.includes('timed out')) {
         error = `Request timed out: The rip.fun profile page took too long to load. This might be due to:\n• High server load on rip.fun\n• Network connectivity issues\n• The profile contains a large amount of data\n\nPlease try again in a moment.`;
       } else if (errorMsg.includes('HTTP error! status: 404')) {
-        error = `Profile not found: The username "${ripUsername.trim()}" doesn't exist on rip.fun. Please check the spelling and try again.`;
+        error = `Profile not found: The user ID "${ripUserId.trim()}" doesn't exist on rip.fun. Please check the user ID and try again.`;
       } else if (errorMsg.includes('HTTP error! status: 500')) {
         error = `Server error: rip.fun is experiencing technical difficulties. Please try again later.`;
       } else if (errorMsg.includes('Failed to fetch')) {
@@ -133,13 +139,13 @@
               <input
                 type="text"
                 id="ripUsername"
-                bind:value={ripUsername}
+                bind:value={ripUserId}
                 class="block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                placeholder="username"
+                placeholder="user ID (e.g., 2010)"
               />
             </div>
             <p class="mt-1 text-sm text-gray-500">
-              Enter any rip.fun username to extract their complete profile data, including cards, packs, and statistics.
+              Enter a rip.fun user ID to extract their complete card collection. Examples: 2010 (ndw), 1169 (cryptondee). This uses the direct API for all cards.
             </p>
           </div>
 
@@ -336,7 +342,7 @@
             <!-- Set Statistics -->
             {#if extractedData.profile.digital_cards && extractedData.profile.digital_cards.length > 0}
               {@const setStats = extractedData.profile.digital_cards.reduce((stats: any, card: any) => {
-                const setName = card.card?.set?.name || 'Unknown Set';
+                const setName = card.set?.name || card.card?.set_id || 'Unknown Set';
                 const rarity = card.card?.rarity || 'Unknown';
                 const value = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
                 
@@ -398,43 +404,236 @@
               </div>
 
               <!-- Digital Cards Section -->
+              {#snippet cardsSection()}
+                {@const cardsBySet = extractedData.profile.digital_cards.reduce((sets: any, card: any) => {
+                  const setName = card.set?.name || card.card?.set_id || 'Unknown Set';
+                  const setId = card.set?.id || card.card?.set_id || 'unknown';
+                  if (!sets[setName]) {
+                    sets[setName] = {
+                      name: setName,
+                      id: setId,
+                      cards: [],
+                      totalValue: 0,
+                      releaseDate: card.card?.set?.release_date
+                    };
+                  }
+                  sets[setName].cards.push(card);
+                  sets[setName].totalValue += parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
+                  return sets;
+                }, {})}
+                
+                {@const processedCards = showDuplicates 
+                  ? (selectedSet === 'all' 
+                      ? extractedData.profile.digital_cards 
+                      : cardsBySet[selectedSet]?.cards || [])
+                  : (selectedSet === 'all'
+                      ? Object.values(extractedData.profile.digital_cards.reduce((unique: any, card: any) => {
+                          const cardId = card.card?.id;
+                          if (!unique[cardId] || unique[cardId].listing) {
+                            unique[cardId] = card;
+                          }
+                          return unique;
+                        }, {})) as any[]
+                      : Object.values((cardsBySet[selectedSet]?.cards || []).reduce((unique: any, card: any) => {
+                          const cardId = card.card?.id;
+                          if (!unique[cardId] || unique[cardId].listing) {
+                            unique[cardId] = card;
+                          }
+                          return unique;
+                        }, {})) as any[])
+                }
+                
               <div class="bg-white shadow rounded-lg p-6">
-                <div class="flex justify-between items-center mb-4">
-                  <h2 class="text-lg font-medium text-gray-900">Digital Cards ({extractedData.profile.digital_cards.length})</h2>
-                  <div class="flex space-x-2">
-                    <span class="text-sm text-gray-500">
-                      Total Value: {extractedData.profile.digital_cards.reduce((sum: any, card: any) => {
-                        const price = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
-                        return sum + price;
-                      }, 0).toFixed(2)} USD
-                    </span>
+                
+                <div class="mb-6">
+                  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <h2 class="text-lg font-medium text-gray-900">
+                      Digital Cards 
+                      <span class="text-base text-gray-500">
+                        ({processedCards.length} {showDuplicates ? 'total' : 'unique'} cards)
+                      </span>
+                    </h2>
+                    
+                    <div class="flex flex-wrap items-center gap-3">
+                      <div class="text-sm text-gray-500">
+                        Total Value: ${processedCards.reduce((sum: number, card: any) => {
+                          const price = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
+                          return sum + price;
+                        }, 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Filters and View Controls -->
+                  <div class="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
+                    <!-- Set Filter -->
+                    <div class="flex-1">
+                      <label for="setFilter" class="block text-sm font-medium text-gray-700 mb-1">
+                        Filter by Set
+                      </label>
+                      <select 
+                        id="setFilter"
+                        bind:value={selectedSet}
+                        class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        <option value="all">All Sets ({extractedData.profile.digital_cards.length} cards)</option>
+                        {#each Object.entries(cardsBySet) as [setName, setData]}
+                          {@const set = setData as any}
+                          <option value={setName}>
+                            {setName} ({set.cards.length} cards)
+                          </option>
+                        {/each}
+                      </select>
+                    </div>
+                    
+                    <!-- View Mode Toggle -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">
+                        View Mode
+                      </label>
+                      <div class="flex rounded-lg border border-gray-300 overflow-hidden">
+                        <button
+                          onclick={() => viewMode = 'grid'}
+                          class="px-3 py-2 text-sm font-medium {viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                        >
+                          Grid
+                        </button>
+                        <button
+                          onclick={() => viewMode = 'table'}
+                          class="px-3 py-2 text-sm font-medium border-l border-gray-300 {viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                        >
+                          Table
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <!-- Duplicate Toggle -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Duplicates
+                      </label>
+                      <label class="flex items-center">
+                        <input
+                          type="checkbox"
+                          bind:checked={showDuplicates}
+                          class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
+                        />
+                        <span class="ml-2 text-sm text-gray-700">Show duplicates</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
-                <!-- Cards by Set -->
-                {#each Object.entries(extractedData.profile.digital_cards.reduce((sets: any, card: any) => {
-                  const setName = card.card?.set?.name || 'Unknown Set';
-                  if (!sets[setName]) sets[setName] = [];
-                  sets[setName].push(card);
-                  return sets;
-                }, {})) as [setName, cards]}
-                  {@const cardsArray = cards as any[]}
-                  <div class="mb-6 border rounded-lg p-4">
-                    <div class="flex justify-between items-center mb-3">
-                      <h3 class="font-medium text-gray-900">
-                        {setName} 
-                        <span class="text-sm text-gray-500">({cardsArray.length} cards)</span>
-                      </h3>
-                      {#if cardsArray[0]?.card?.set}
-                        <div class="text-sm text-gray-500">
-                          Release: {new Date(cardsArray[0].card.set.release_date).toLocaleDateString()}
+                <!-- Cards Display -->
+                {#if viewMode === 'grid'}
+                  <!-- Grid View -->
+                  {#if selectedSet === 'all'}
+                    <!-- All Sets - Grouped Display -->
+                    {#each Object.entries(cardsBySet) as [setName, setData]}
+                      {@const set = setData as any}
+                      {@const setCards = showDuplicates 
+                        ? set.cards 
+                        : Object.values(set.cards.reduce((unique: any, card: any) => {
+                            const cardId = card.card?.id;
+                            if (!unique[cardId] || unique[cardId].listing) {
+                              unique[cardId] = card;
+                            }
+                            return unique;
+                          }, {})) as any[]
+                      }
+                      
+                      <div class="mb-6 border rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-3">
+                          <h3 class="font-medium text-gray-900">
+                            {setName}
+                            <span class="text-sm text-gray-500">({setCards.length} cards)</span>
+                          </h3>
+                          {#if set.releaseDate}
+                            <div class="text-sm text-gray-500">
+                              Release: {new Date(set.releaseDate).toLocaleDateString()}
+                            </div>
+                          {/if}
                         </div>
-                      {/if}
-                    </div>
-                    
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {#each setCards as card}
+                            {@const duplicateCount = showDuplicates ? 1 : set.cards.filter((c: any) => c.card?.id === card.card?.id).length}
+                            <div class="border border-gray-200 rounded-lg p-3 bg-gray-50 relative">
+                              {#if duplicateCount > 1}
+                                <div class="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-semibold">
+                                  {duplicateCount}
+                                </div>
+                              {/if}
+                              <div class="flex items-start justify-between mb-2">
+                                <div class="flex-1">
+                                  <h4 class="font-medium text-sm text-gray-900">
+                                    {card.card?.name || 'Unknown Card'}
+                                    {#if card.card?.card_number}
+                                      <span class="text-gray-500">#{card.card.card_number}</span>
+                                    {/if}
+                                  </h4>
+                                  <p class="text-xs text-gray-600 mt-1">
+                                    {card.card?.rarity || 'Unknown Rarity'}
+                                    {#if card.card?.types}
+                                      • {card.card.types.join(', ')}
+                                    {/if}
+                                  </p>
+                                </div>
+                                {#if card.card?.small_image_url}
+                                  <img 
+                                    src={card.card.small_image_url} 
+                                    alt={card.card?.name} 
+                                    class="w-10 h-14 object-cover rounded border ml-2"
+                                    loading="lazy"
+                                  />
+                                {/if}
+                              </div>
+                              
+                              <div class="space-y-1 text-xs">
+                                {#if card.card?.hp}
+                                  <div class="flex justify-between">
+                                    <span class="text-gray-500">HP:</span>
+                                    <span class="text-gray-900">{card.card.hp}</span>
+                                  </div>
+                                {/if}
+                                {#if card.listing}
+                                  <div class="flex justify-between">
+                                    <span class="text-gray-500">Listed:</span>
+                                    <span class="text-green-600 font-medium">${card.listing.usd_price}</span>
+                                  </div>
+                                {:else if card.card?.raw_price}
+                                  <div class="flex justify-between">
+                                    <span class="text-gray-500">Value:</span>
+                                    <span class="text-gray-900">${card.card.raw_price}</span>
+                                  </div>
+                                {/if}
+                                <div class="flex justify-between">
+                                  <span class="text-gray-500">Status:</span>
+                                  <span class="text-gray-900">
+                                    {#if card.is_listed}
+                                      <span class="text-green-600">Listed</span>
+                                    {:else}
+                                      <span class="text-gray-600">Owned</span>
+                                    {/if}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          {/each}
+                        </div>
+                      </div>
+                    {/each}
+                  {:else}
+                    <!-- Single Set - Grid Display -->
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {#each cardsArray as card}
-                        <div class="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                      {#each processedCards as card}
+                        {@const duplicateCount = showDuplicates ? 1 : cardsBySet[selectedSet]?.cards.filter((c: any) => c.card?.id === card.card?.id).length || 1}
+                        <div class="border border-gray-200 rounded-lg p-3 bg-gray-50 relative">
+                          {#if duplicateCount > 1}
+                            <div class="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-semibold">
+                              {duplicateCount}
+                            </div>
+                          {/if}
                           <div class="flex items-start justify-between mb-2">
                             <div class="flex-1">
                               <h4 class="font-medium text-sm text-gray-900">
@@ -492,9 +691,110 @@
                         </div>
                       {/each}
                     </div>
+                  {/if}
+                {:else}
+                  <!-- Table View -->
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Card
+                          </th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Set
+                          </th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Rarity
+                          </th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Type
+                          </th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            HP
+                          </th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Value
+                          </th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          {#if !showDuplicates}
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Count
+                            </th>
+                          {/if}
+                        </tr>
+                      </thead>
+                      <tbody class="bg-white divide-y divide-gray-200">
+                        {#each processedCards as card}
+                          {@const duplicateCount = showDuplicates ? 1 : (selectedSet === 'all' 
+                            ? extractedData.profile.digital_cards.filter((c: any) => c.card?.id === card.card?.id).length
+                            : cardsBySet[selectedSet]?.cards.filter((c: any) => c.card?.id === card.card?.id).length || 1)}
+                          <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                              <div class="flex items-center">
+                                {#if card.card?.small_image_url}
+                                  <img 
+                                    src={card.card.small_image_url} 
+                                    alt={card.card?.name} 
+                                    class="w-8 h-11 object-cover rounded border mr-3"
+                                    loading="lazy"
+                                  />
+                                {/if}
+                                <div>
+                                  <div class="text-sm font-medium text-gray-900">
+                                    {card.card?.name || 'Unknown Card'}
+                                  </div>
+                                  {#if card.card?.card_number}
+                                    <div class="text-sm text-gray-500">#{card.card.card_number}</div>
+                                  {/if}
+                                </div>
+                              </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {card.set?.name || card.card?.set_id || 'Unknown'}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                {card.card?.rarity || 'Unknown'}
+                              </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {card.card?.types?.join(', ') || 'Unknown'}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {card.card?.hp || '—'}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {#if card.listing}
+                                <span class="text-green-600 font-medium">${card.listing.usd_price}</span>
+                              {:else if card.card?.raw_price}
+                                ${card.card.raw_price}
+                              {:else}
+                                —
+                              {/if}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {card.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                {card.is_listed ? 'Listed' : 'Owned'}
+                              </span>
+                            </td>
+                            {#if !showDuplicates}
+                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {duplicateCount > 1 ? duplicateCount : '1'}
+                              </td>
+                            {/if}
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
                   </div>
-                {/each}
+                {/if}
               </div>
+              {/snippet}
+              
+              {@render cardsSection()}
             {/if}
 
             <!-- Digital Products Section -->
