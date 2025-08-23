@@ -1,4 +1,111 @@
 <script lang="ts">
+  // localStorage utility functions
+  function getCacheKey(userId: string): string {
+    return `ripexplorer_cache_${userId}`;
+  }
+
+  function getSetCacheKey(setId: string): string {
+    return `ripexplorer_set_${setId}`;
+  }
+
+  function saveToCache(userId: string, data: any): void {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now(),
+        userId
+      };
+      localStorage.setItem(getCacheKey(userId), JSON.stringify(cacheData));
+    } catch (err) {
+      console.warn('Failed to save data to localStorage:', err);
+    }
+  }
+
+  function loadFromCache(userId: string): any | null {
+    try {
+      const cached = localStorage.getItem(getCacheKey(userId));
+      if (cached) {
+        const cacheData = JSON.parse(cached);
+        // Check if cache is for the same user
+        if (cacheData.userId === userId) {
+          return cacheData;
+        }
+      }
+      return null;
+    } catch (err) {
+      console.warn('Failed to load data from localStorage:', err);
+      return null;
+    }
+  }
+
+  function saveSetToCache(setId: string, data: any): void {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now(),
+        setId
+      };
+      localStorage.setItem(getSetCacheKey(setId), JSON.stringify(cacheData));
+    } catch (err) {
+      console.warn('Failed to save set data to localStorage:', err);
+    }
+  }
+
+  function loadSetFromCache(setId: string): any | null {
+    try {
+      const cached = localStorage.getItem(getSetCacheKey(setId));
+      if (cached) {
+        const cacheData = JSON.parse(cached);
+        return cacheData;
+      }
+      return null;
+    } catch (err) {
+      console.warn('Failed to load set data from localStorage:', err);
+      return null;
+    }
+  }
+
+  function clearUserCache(userId: string): void {
+    try {
+      localStorage.removeItem(getCacheKey(userId));
+    } catch (err) {
+      console.warn('Failed to clear user cache:', err);
+    }
+  }
+
+  function clearAllSetCaches(): void {
+    try {
+      // Get all localStorage keys
+      const keys = Object.keys(localStorage);
+      // Remove all set cache keys
+      keys.forEach(key => {
+        if (key.startsWith('ripexplorer_set_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      setCardsData = {}; // Clear in-memory set cache too
+      console.log('Cleared all set caches');
+    } catch (err) {
+      console.warn('Failed to clear set caches:', err);
+    }
+  }
+
+  function clearAllCaches(): void {
+    try {
+      // Clear all user and set caches
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('ripexplorer_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      setCardsData = {};
+      console.log('Cleared all caches (user + set data)');
+    } catch (err) {
+      console.warn('Failed to clear all caches:', err);
+    }
+  }
+
   // Helper function to get human-readable set name
   function getSetName(card: any): string {
     // First try to get from the set object
@@ -19,6 +126,7 @@
   let loading = $state(false);
   let error = $state('');
   let extractionInfo = $state<any>(null);
+  let forceRefresh = $state(false);
   let retryAttempt = $state(0);
   let loadingMessage = $state('Starting extraction...');
   
@@ -40,6 +148,7 @@
   // Missing cards state
   let showMissingCards = $state(false);
   let onlyMissingCards = $state(false);
+  let availableOnly = $state(false);
   let setCardsData = $state<any>({});
   let loadingSetData = $state<any>({});
   let setDataErrors = $state<any>({});
@@ -75,6 +184,11 @@
         case 'value':
           aValue = parseFloat(a.listing?.usd_price || a.card?.raw_price || '0');
           bValue = parseFloat(b.listing?.usd_price || b.card?.raw_price || '0');
+          break;
+        case 'listedPrice':
+          // For missing cards, use lowestPrice; for owned cards, use existing price logic
+          aValue = a.isMissing ? (a.lowestPrice || 0) : parseFloat(a.listing?.usd_price || a.card?.raw_price || '0');
+          bValue = b.isMissing ? (b.lowestPrice || 0) : parseFloat(b.listing?.usd_price || b.card?.raw_price || '0');
           break;
         default:
           return 0;
@@ -150,7 +264,10 @@
       
       const matchesRarity = selectedRarity === 'all' || card.card?.rarity === selectedRarity;
       
-      return matchesSearch && matchesRarity;
+      // Available only filter - only applies to missing cards
+      const matchesAvailable = !availableOnly || !card.isMissing || card.is_listed;
+      
+      return matchesSearch && matchesRarity && matchesAvailable;
     });
   }
   
@@ -161,6 +278,7 @@
     selectedRarity;
     selectedSet;
     onlyMissingCards;
+    availableOnly;
     currentPage = 1;
   });
   
@@ -179,6 +297,16 @@
   async function fetchCompleteSetData(setId: string) {
     if (setCardsData[setId]) {
       return setCardsData[setId]; // Return cached data if available
+    }
+
+    // Check localStorage cache unless force refresh is requested
+    if (!forceRefresh) {
+      const cached = loadSetFromCache(setId);
+      if (cached) {
+        console.log('Loading set data from cache:', setId);
+        setCardsData[setId] = cached.data;
+        return cached.data;
+      }
     }
 
     loadingSetData[setId] = true;
@@ -200,6 +328,11 @@
 
       // Cache the data (already cleaned by backend)
       setCardsData[setId] = data;
+      
+      // Save to localStorage cache
+      saveSetToCache(setId, data);
+      console.log('Saved set data to cache:', setId);
+      
       return data;
     } catch (err) {
       console.error(`Error fetching set ${setId} data:`, err);
@@ -228,13 +361,49 @@
         return setCard.id && !userCardIds.has(setCard.id);
       });
 
-      // Transform missing cards to match user card structure for consistent UI
-      return missingCards.map((card: any) => ({
-        card: card, // Wrap the card data in a 'card' property to match user card structure
-        isMissing: true, // Mark as missing for UI purposes
-        is_listed: false, // Missing cards are not listed
-        listing: null // No listing data for missing cards
-      }));
+      // Transform missing cards and fetch listing data for each
+      const missingCardsWithListings = await Promise.all(
+        missingCards.map(async (card: any) => {
+          let listingData = null;
+          let isListed = false;
+          let lowestPrice = null;
+          
+          try {
+            // Fetch listing data for this missing card
+            const listingResponse = await fetch(`/api/card/${card.id}/listings`);
+            if (listingResponse.ok) {
+              listingData = await listingResponse.json();
+              
+              // Check if there are any active listings
+              if (listingData.listings && listingData.listings.length > 0) {
+                isListed = true;
+                // Find the lowest price from active listings using usd_price
+                const prices = listingData.listings
+                  .filter((listing: any) => listing.usd_price)
+                  .map((listing: any) => parseFloat(listing.usd_price));
+                  
+                if (prices.length > 0) {
+                  lowestPrice = Math.min(...prices);
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching listings for card ${card.id}:`, err);
+          }
+          
+          return {
+            card: card, // Wrap the card data in a 'card' property to match user card structure
+            isMissing: true, // Mark as missing for UI purposes
+            is_listed: isListed, // Whether the card has active listings
+            listing: listingData, // Full listing data
+            lowestPrice: lowestPrice, // Lowest available price
+            buyNowUrl: `https://www.rip.fun/card/${card.id}`, // Buy now URL
+            marketValue: card.market_price || card.raw_price // Market value for missing cards
+          };
+        })
+      );
+      
+      return missingCardsWithListings;
     } catch (err) {
       console.error(`Error getting missing cards for set ${setId}:`, err);
       return [];
@@ -393,12 +562,28 @@
       return;
     }
 
+    // Check cache first unless force refresh is requested
+    if (!forceRefresh) {
+      const cached = loadFromCache(ripUserId.trim());
+      if (cached) {
+        console.log('Loading data from cache for user:', ripUserId.trim());
+        extractedData = cached.data;
+        extractionInfo = {
+          source: 'cache',
+          timestamp: cached.timestamp,
+          userId: ripUserId.trim()
+        };
+        // Don't return here, let the normal flow continue to populate cardsBySet
+        return;
+      }
+    }
+
     loading = true;
     error = '';
     extractedData = null;
     extractionInfo = null;
     retryAttempt = 0;
-    loadingMessage = 'Fetching profile data from rip.fun...';
+    loadingMessage = forceRefresh ? 'Refreshing profile data from rip.fun...' : 'Fetching profile data from rip.fun...';
 
     // Set up periodic message updates to show progress
     const messageInterval = setInterval(() => {
@@ -440,6 +625,11 @@
         targetUrl: result.targetUrl,
         timestamp: result.timestamp
       };
+      
+      // Save to cache
+      saveToCache(ripUserId.trim(), extractedData);
+      console.log('Saved user data to cache for:', ripUserId.trim());
+      
       loadingMessage = 'Extraction completed successfully!';
       
       // Automatically fetch complete set data for all sets the user owns
@@ -470,6 +660,7 @@
       clearInterval(messageInterval);
       loading = false;
       retryAttempt = 0;
+      forceRefresh = false; // Reset force refresh flag
     }
   }
 
@@ -557,25 +748,46 @@
             </div>
           {/if}
 
-          <button
-            onclick={runExtraction}
-            disabled={loading}
-            class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {#if loading}
-              <div class="flex items-center">
-                <div class="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                <div class="flex flex-col items-start">
-                  <span class="font-medium">{loadingMessage}</span>
-                  {#if retryAttempt > 15}
-                    <span class="text-xs text-indigo-200 mt-1">Elapsed: {retryAttempt}s</span>
-                  {/if}
+          <div class="flex space-x-3">
+            <button
+              onclick={runExtraction}
+              disabled={loading}
+              class="flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {#if loading}
+                <div class="flex items-center">
+                  <div class="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  <div class="flex flex-col items-start">
+                    <span class="font-medium">{loadingMessage}</span>
+                    {#if retryAttempt > 15}
+                      <span class="text-xs text-indigo-200 mt-1">Elapsed: {retryAttempt}s</span>
+                    {/if}
+                  </div>
                 </div>
-              </div>
-            {:else}
-              Extract Profile Data
+              {:else}
+                Extract Profile Data
+              {/if}
+            </button>
+            
+            {#if extractedData}
+              <button
+                onclick={() => { 
+                  forceRefresh = true; 
+                  clearUserCache(ripUserId.trim());
+                  // Note: We don't clear set caches since set data is static and doesn't change
+                  runExtraction(); 
+                }}
+                disabled={loading}
+                class="inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                title="Refresh user data from server (preserves set data cache)"
+              >
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Refresh
+              </button>
             {/if}
-          </button>
+          </div>
         </div>
       </div>
     </div>
@@ -603,24 +815,69 @@
           
           {#if extractionInfo}
             <div class="bg-gray-50 rounded p-4 mb-4">
-              <dl class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-3">
+              <dl class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-4">
                 <div>
                   <dt class="text-sm font-medium text-gray-500">Username</dt>
-                  <dd class="text-sm text-gray-900">{extractionInfo.username}</dd>
+                  <dd class="text-sm text-gray-900">{extractionInfo.username || ripUserId}</dd>
                 </div>
                 <div>
-                  <dt class="text-sm font-medium text-gray-500">Source URL</dt>
+                  <dt class="text-sm font-medium text-gray-500">Source</dt>
                   <dd class="text-sm text-gray-900">
-                    <a href={extractionInfo.targetUrl} target="_blank" class="text-indigo-600 hover:text-indigo-900">
-                      {extractionInfo.targetUrl}
-                    </a>
+                    {#if extractionInfo.source === 'cache'}
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        📦 Cached
+                      </span>
+                    {:else}
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        🌐 Live
+                      </span>
+                    {/if}
                   </dd>
                 </div>
                 <div>
-                  <dt class="text-sm font-medium text-gray-500">Extracted</dt>
+                  <dt class="text-sm font-medium text-gray-500">Profile URL</dt>
+                  <dd class="text-sm text-gray-900">
+                    {#if extractionInfo.targetUrl}
+                      <a href={extractionInfo.targetUrl} target="_blank" class="text-indigo-600 hover:text-indigo-900">
+                        View Profile
+                      </a>
+                    {:else}
+                      <a href="https://www.rip.fun/user/{ripUserId}" target="_blank" class="text-indigo-600 hover:text-indigo-900">
+                        View Profile
+                      </a>
+                    {/if}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
                   <dd class="text-sm text-gray-900">{new Date(extractionInfo.timestamp).toLocaleString()}</dd>
                 </div>
               </dl>
+              
+              <!-- Advanced Cache Management -->
+              <div class="mt-3 pt-3 border-t border-gray-200">
+                <details class="text-sm">
+                  <summary class="cursor-pointer text-gray-600 hover:text-gray-900 select-none">
+                    Advanced Cache Options
+                  </summary>
+                  <div class="mt-2 space-x-2">
+                    <button
+                      onclick={clearAllSetCaches}
+                      class="text-xs px-2 py-1 border border-gray-300 rounded text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                      title="Clear all Pokemon TCG set data caches"
+                    >
+                      Clear Set Caches
+                    </button>
+                    <button
+                      onclick={clearAllCaches}
+                      class="text-xs px-2 py-1 border border-red-300 rounded text-red-600 hover:text-red-900 hover:bg-red-50"
+                      title="Clear all cached data (user + set data)"
+                    >
+                      Clear All Caches
+                    </button>
+                  </div>
+                </details>
+              </div>
             </div>
           {/if}
           
@@ -966,6 +1223,17 @@
                               </svg>
                             {/if}
                           </label>
+                          
+                          <!-- Available Only Toggle -->
+                          <label class="flex items-center mt-2">
+                            <input
+                              type="checkbox"
+                              bind:checked={availableOnly}
+                              class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
+                              disabled={fetchingAllSets || loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
+                            />
+                            <span class="ml-2 text-sm text-gray-700">Available only (for missing cards)</span>
+                          </label>
                         </div>
                       {/if}
                       
@@ -1219,6 +1487,26 @@
                               {/if}
                             </div>
                           </th>
+                          <th 
+                            scope="col" 
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                            onclick={() => handleSort('listedPrice')}
+                          >
+                            <div class="flex items-center space-x-1">
+                              <span>Listed Price</span>
+                              {#if sortColumn === 'listedPrice'}
+                                <span class="text-indigo-600">
+                                  {sortDirection === 'asc' ? '↑' : '↓'}
+                                </span>
+                              {/if}
+                            </div>
+                          </th>
+                          <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Available
+                          </th>
+                          <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Action
+                          </th>
                           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Status
                           </th>
@@ -1268,12 +1556,57 @@
                               {card.card?.types?.join(', ') || 'Unknown'}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {#if card.listing}
+                              {#if card.isMissing && card.marketValue}
+                                ${card.marketValue}
+                              {:else if card.listing}
                                 <span class="text-green-600 font-medium">${card.listing.usd_price}</span>
                               {:else if card.card?.raw_price}
                                 ${card.card.raw_price}
                               {:else}
                                 —
+                              {/if}
+                            </td>
+                            <!-- Listed Price Column -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {#if card.isMissing && card.lowestPrice}
+                                ${card.lowestPrice.toFixed(2)}
+                              {:else if card.listing}
+                                <span class="text-green-600 font-medium">${card.listing.usd_price}</span>
+                              {:else if card.card?.raw_price}
+                                ${card.card.raw_price}
+                              {:else}
+                                —
+                              {/if}
+                            </td>
+                            <!-- Available Column -->
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                              {#if card.isMissing}
+                                {#if card.is_listed}
+                                  <svg class="w-5 h-5 text-green-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                  </svg>
+                                {:else}
+                                  <svg class="w-5 h-5 text-red-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                  </svg>
+                                {/if}
+                              {:else}
+                                <span class="text-gray-400 text-sm">N/A</span>
+                              {/if}
+                            </td>
+                            <!-- Action Column -->
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                              {#if card.isMissing}
+                                <a 
+                                  href={card.buyNowUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-white {card.is_listed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-500 hover:bg-gray-600'}"
+                                >
+                                  {card.is_listed ? 'Buy Now' : 'Make Offer'}
+                                </a>
+                              {:else}
+                                <span class="text-gray-400 text-sm">N/A</span>
                               {/if}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
