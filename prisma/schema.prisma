@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  name        String
+  bio         String?
+  website     String?
+  twitter     String?
+  github      String?
+  linkedin    String?
+  wallet      String?
+  email       String?
+  location    String?
+  avatar      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  comparisons Comparison[]
+  
+  @@map("profiles")
+}
+
+model Comparison {
+  id          String   @id @default(cuid())
+  profileId   String
+  targetUrl   String
+  extractedData String
+  differences   String
+  createdAt     DateTime @default(now())
+  
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  @@map("comparisons")
+}
