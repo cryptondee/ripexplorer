@@ -1,4 +1,19 @@
 <script lang="ts">
+  // Helper function to get human-readable set name
+  function getSetName(card: any): string {
+    // First try to get from the set object
+    if (card.set?.name) return card.set.name;
+    
+    // If no set object, try to derive from setCardsData using set_id
+    const setId = card.card?.set_id;
+    if (setId && setCardsData[setId]?.cards?.[0]?.set?.name) {
+      return setCardsData[setId].cards[0].set.name;
+    }
+    
+    // Fallback to set_id or Unknown
+    return card.card?.set_id || 'Unknown';
+  }
+
   let ripUserId = $state('');
   let extractedData = $state<any>(null);
   let loading = $state(false);
@@ -10,7 +25,6 @@
   // Cards display state
   let selectedSet = $state('all');
   let viewMode = $state<'grid' | 'table'>('table');
-  let showDuplicates = $state(false);
   let searchQuery = $state('');
   let selectedRarity = $state('all');
   let sortColumn = $state('card_number');
@@ -22,6 +36,15 @@
   let currentPage = $state(1);
   let pageSize = $state(50);
   let pageSizeOptions = [10, 20, 50, 100];
+  
+  // Missing cards state
+  let showMissingCards = $state(false);
+  let onlyMissingCards = $state(false);
+  let setCardsData = $state<any>({});
+  let loadingSetData = $state<any>({});
+  let setDataErrors = $state<any>({});
+  let fetchingAllSets = $state(false);
+  let bulkFetchErrors = $state<string[]>([]);
   
   // Sorting function
   function sortCards(cards: any[]) {
@@ -38,8 +61,8 @@
           bValue = b.card?.name || '';
           break;
         case 'set':
-          aValue = a.set?.name || a.card?.set_id || '';
-          bValue = b.set?.name || b.card?.set_id || '';
+          aValue = getSetName(a);
+          bValue = getSetName(b);
           break;
         case 'rarity':
           aValue = a.card?.rarity || '';
@@ -123,7 +146,7 @@
       const matchesSearch = !searchQuery || 
         (card.card?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (card.card?.card_number || '').includes(searchQuery) ||
-        (card.set?.name || card.card?.set_id || '').toLowerCase().includes(searchQuery.toLowerCase());
+        getSetName(card).toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesRarity = selectedRarity === 'all' || card.card?.rarity === selectedRarity;
       
@@ -137,15 +160,13 @@
     searchQuery;
     selectedRarity;
     selectedSet;
+    onlyMissingCards;
     currentPage = 1;
   });
   
   // Handle card click to show modal
   function openCardModal(card: any, allCardsOfSameType: any[] = []) {
-    selectedCard = {
-      ...card,
-      duplicates: allCardsOfSameType.length > 1 ? allCardsOfSameType : [card]
-    };
+    selectedCard = card;
     showCardModal = true;
   }
   
@@ -153,6 +174,218 @@
     showCardModal = false;
     selectedCard = null;
   }
+
+  // Function to fetch complete set data from rip.fun API
+  async function fetchCompleteSetData(setId: string) {
+    if (setCardsData[setId]) {
+      return setCardsData[setId]; // Return cached data if available
+    }
+
+    loadingSetData[setId] = true;
+    setDataErrors[setId] = null;
+
+    try {
+      const response = await fetch(`/api/set/${setId}?page=1&limit=1000&sort=number-asc&all=true`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Failed to fetch set data: ${response.status} ${response.statusText}. ${errorData.details || ''}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.details || data.error);
+      }
+
+      // Cache the data (already cleaned by backend)
+      setCardsData[setId] = data;
+      return data;
+    } catch (err) {
+      console.error(`Error fetching set ${setId} data:`, err);
+      setDataErrors[setId] = err instanceof Error ? err.message : 'Failed to fetch set data';
+      throw err;
+    } finally {
+      loadingSetData[setId] = false;
+    }
+  }
+
+  // Function to get missing cards for a specific set
+  async function getMissingCards(setId: string, userCards: any[]) {
+    try {
+      const completeSetData = await fetchCompleteSetData(setId);
+      
+      if (!completeSetData?.cards) {
+        return [];
+      }
+
+      // Get all card IDs that the user owns from this set
+      const userCardIds = new Set(userCards.map(card => card.card?.id).filter(Boolean));
+      
+      // Find cards from the complete set that the user doesn't have
+      // Note: Complete set cards have ID at root level, user cards have nested structure
+      const missingCards = completeSetData.cards.filter((setCard: any) => {
+        return setCard.id && !userCardIds.has(setCard.id);
+      });
+
+      // Transform missing cards to match user card structure for consistent UI
+      return missingCards.map((card: any) => ({
+        card: card, // Wrap the card data in a 'card' property to match user card structure
+        isMissing: true, // Mark as missing for UI purposes
+        is_listed: false, // Missing cards are not listed
+        listing: null // No listing data for missing cards
+      }));
+    } catch (err) {
+      console.error(`Error getting missing cards for set ${setId}:`, err);
+      return [];
+    }
+  }
+
+  // Function to get all missing cards for the current set selection
+  async function getAllMissingCards() {
+    if (!extractedData?.profile?.digital_cards || selectedSet === 'all') {
+      return [];
+    }
+
+    // Find the set ID for the selected set
+    const userCardsForSet = cardsBySet[selectedSet]?.cards || [];
+    
+    // Get the set ID from the first card in the set
+    const setId = userCardsForSet[0]?.card?.set_id;
+    
+    if (!setId) {
+      return [];
+    }
+
+    return await getMissingCards(setId, userCardsForSet);
+  }
+
+  // Function to fetch complete set data for all sets the user owns
+  async function fetchAllUserSets() {
+    if (!extractedData?.profile?.digital_cards) {
+      return;
+    }
+
+    fetchingAllSets = true;
+    bulkFetchErrors = [];
+
+    // Get all unique set IDs from user's cards
+    const userSetIds = new Set<string>();
+    extractedData.profile.digital_cards.forEach((card: any) => {
+      const setId = card.card?.set_id;
+      if (setId) {
+        userSetIds.add(setId);
+      }
+    });
+
+    console.log('Fetching complete set data for sets:', Array.from(userSetIds));
+
+    // Fetch complete set data for each unique set
+    const fetchPromises = Array.from(userSetIds).map(async (setId) => {
+      try {
+        await fetchCompleteSetData(setId);
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        console.error(`Failed to fetch complete set data for ${setId}:`, err);
+        bulkFetchErrors = [...bulkFetchErrors, `Set ${setId}: ${errorMsg}`];
+      }
+    });
+
+    await Promise.all(fetchPromises);
+    console.log('All set data fetching completed');
+    fetchingAllSets = false;
+  }
+
+  // Reactive state for combined cards (owned + missing)
+  let combinedCards = $state<any[]>([]);
+  
+  // Reactive cardsBySet calculation
+  let cardsBySet = $state<any>({});
+
+  // Calculate cardsBySet when extractedData changes
+  $effect(() => {
+    if (!extractedData?.profile?.digital_cards) {
+      cardsBySet = {};
+      return;
+    }
+
+    cardsBySet = extractedData.profile.digital_cards.reduce((sets: any, card: any) => {
+      const setName = getSetName(card);
+      const setId = card.set?.id || card.card?.set_id || 'unknown';
+      if (!sets[setName]) {
+        sets[setName] = {
+          name: setName,
+          id: setId,
+          cards: [],
+          totalValue: 0,
+          listedCount: 0,
+          ownedCount: 0,
+          releaseDate: card.card?.set?.release_date
+        };
+      }
+      
+      sets[setName].cards.push(card);
+      sets[setName].totalValue += parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
+      
+      if (card.is_listed) {
+        sets[setName].listedCount++;
+      } else {
+        sets[setName].ownedCount++;
+      }
+      
+      return sets;
+    }, {});
+  });
+
+  // Update combined cards when relevant state changes
+  $effect(async () => {
+    if (!extractedData?.profile?.digital_cards) {
+      combinedCards = [];
+      return;
+    }
+
+    // Get base owned cards (deduplicated for cleaner display)
+    const ownedCards = selectedSet === 'all'
+      ? Object.values(extractedData.profile.digital_cards.reduce((unique: any, card: any) => {
+          const cardId = card.card?.id;
+          if (!unique[cardId] || unique[cardId].listing) {
+            unique[cardId] = card;
+          }
+          return unique;
+        }, {})) as any[]
+      : Object.values((cardsBySet[selectedSet]?.cards || []).reduce((unique: any, card: any) => {
+          const cardId = card.card?.id;
+          if (!unique[cardId] || unique[cardId].listing) {
+            unique[cardId] = card;
+          }
+          return unique;
+        }, {})) as any[];
+
+    // Handle missing cards based on toggles
+    if (selectedSet !== 'all' && (showMissingCards || onlyMissingCards)) {
+      console.log('Missing cards logic triggered:', { showMissingCards, onlyMissingCards, selectedSet });
+      try {
+        const missingCards = await getAllMissingCards();
+        console.log('Got missing cards:', missingCards.length);
+        
+        if (onlyMissingCards) {
+          // Show only missing cards
+          console.log('Showing only missing cards');
+          combinedCards = missingCards;
+        } else if (showMissingCards && !onlyMissingCards) {
+          // Show both owned and missing cards
+          console.log('Showing owned + missing cards');
+          combinedCards = [...ownedCards, ...missingCards];
+        }
+      } catch (err) {
+        console.error('Error loading missing cards:', err);
+        combinedCards = ownedCards;
+      }
+    } else {
+      console.log('Not showing missing cards:', { selectedSet, showMissingCards, onlyMissingCards });
+      combinedCards = ownedCards;
+    }
+  });
 
   async function runExtraction() {
     if (!ripUserId.trim()) {
@@ -208,6 +441,16 @@
         timestamp: result.timestamp
       };
       loadingMessage = 'Extraction completed successfully!';
+      
+      // Automatically fetch complete set data for all sets the user owns
+      loadingMessage = 'Loading complete set information...';
+      try {
+        await fetchAllUserSets();
+        loadingMessage = 'All data loaded successfully!';
+      } catch (err) {
+        console.warn('Some set data failed to load:', err);
+        loadingMessage = 'Extraction completed (some set data may be incomplete)';
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'An error occurred';
       
@@ -484,7 +727,7 @@
             <!-- Set Statistics -->
             {#if extractedData.profile.digital_cards && extractedData.profile.digital_cards.length > 0}
               {@const setStats = extractedData.profile.digital_cards.reduce((stats: any, card: any) => {
-                const setName = card.set?.name || card.card?.set_id || 'Unknown Set';
+                const setName = getSetName(card);
                 const rarity = card.card?.rarity || 'Unknown';
                 const value = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
                 
@@ -547,43 +790,7 @@
 
               <!-- Digital Cards Section -->
               {#snippet cardsSection()}
-                {@const cardsBySet = extractedData.profile.digital_cards.reduce((sets: any, card: any) => {
-                  const setName = card.set?.name || card.card?.set_id || 'Unknown Set';
-                  const setId = card.set?.id || card.card?.set_id || 'unknown';
-                  if (!sets[setName]) {
-                    sets[setName] = {
-                      name: setName,
-                      id: setId,
-                      cards: [],
-                      totalValue: 0,
-                      releaseDate: card.card?.set?.release_date
-                    };
-                  }
-                  sets[setName].cards.push(card);
-                  sets[setName].totalValue += parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
-                  return sets;
-                }, {})}
-                
-                {@const baseCards = showDuplicates 
-                  ? (selectedSet === 'all' 
-                      ? extractedData.profile.digital_cards 
-                      : cardsBySet[selectedSet]?.cards || [])
-                  : (selectedSet === 'all'
-                      ? Object.values(extractedData.profile.digital_cards.reduce((unique: any, card: any) => {
-                          const cardId = card.card?.id;
-                          if (!unique[cardId] || unique[cardId].listing) {
-                            unique[cardId] = card;
-                          }
-                          return unique;
-                        }, {})) as any[]
-                      : Object.values((cardsBySet[selectedSet]?.cards || []).reduce((unique: any, card: any) => {
-                          const cardId = card.card?.id;
-                          if (!unique[cardId] || unique[cardId].listing) {
-                            unique[cardId] = card;
-                          }
-                          return unique;
-                        }, {})) as any[])
-                }
+                {@const baseCards = combinedCards}
                 {@const filteredCards = filterCards(baseCards)}
                 {@const sortedCards = sortCards(filteredCards)}
                 {@const totalCards = sortedCards.length}
@@ -598,7 +805,7 @@
                     <h2 class="text-lg font-medium text-gray-900">
                       Digital Cards 
                       <span class="text-base text-gray-500">
-                        (Showing {paginatedCards.length} of {totalCards} {showDuplicates ? 'total' : 'unique'} cards)
+                        (Showing {paginatedCards.length} of {totalCards} cards)
                       </span>
                     </h2>
                     
@@ -693,20 +900,74 @@
                         </div>
                       </div>
                       
-                      <!-- Duplicate Toggle -->
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                          Duplicates
-                        </label>
-                        <label class="flex items-center">
-                          <input
-                            type="checkbox"
-                            bind:checked={showDuplicates}
-                            class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
-                          />
-                          <span class="ml-2 text-sm text-gray-700">Show duplicates</span>
-                        </label>
-                      </div>
+                      
+                      <!-- Missing Cards Toggle -->
+                      {#if selectedSet !== 'all'}
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Missing Cards
+                          </label>
+                          <label class="flex items-center">
+                            <input
+                              type="checkbox"
+                              bind:checked={showMissingCards}
+                              onchange={() => { if (showMissingCards) onlyMissingCards = false; }}
+                              class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
+                              disabled={fetchingAllSets || loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
+                            />
+                            <span class="ml-2 text-sm text-gray-700">Show missing cards</span>
+                            {#if fetchingAllSets}
+                              <svg class="ml-2 w-4 h-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            {:else if loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
+                              <svg class="ml-2 w-4 h-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            {/if}
+                          </label>
+                          {#if setDataErrors[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
+                            <div class="mt-1 text-xs text-red-600">
+                              Error loading set data: {setDataErrors[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
+                            </div>
+                          {/if}
+                          {#if bulkFetchErrors.length > 0}
+                            <div class="mt-1 text-xs text-yellow-600">
+                              Some set data failed to load ({bulkFetchErrors.length} errors)
+                            </div>
+                          {/if}
+                        </div>
+                        
+                        <!-- Only Missing Cards Toggle -->
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Filter Options
+                          </label>
+                          <label class="flex items-center">
+                            <input
+                              type="checkbox"
+                              bind:checked={onlyMissingCards}
+                              onchange={() => { if (onlyMissingCards) showMissingCards = false; }}
+                              class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
+                              disabled={fetchingAllSets || loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
+                            />
+                            <span class="ml-2 text-sm text-gray-700">Only show missing cards</span>
+                            {#if fetchingAllSets}
+                              <svg class="ml-2 w-4 h-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            {:else if loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
+                              <svg class="ml-2 w-4 h-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            {/if}
+                          </label>
+                        </div>
+                      {/if}
                       
                       <!-- Page Size Selector -->
                       <div>
@@ -735,16 +996,13 @@
                     <!-- All Sets - Grouped Display -->
                     {#each Object.entries(cardsBySet) as [setName, setData]}
                       {@const set = setData as any}
-                      {@const setCards = showDuplicates 
-                        ? set.cards 
-                        : Object.values(set.cards.reduce((unique: any, card: any) => {
-                            const cardId = card.card?.id;
-                            if (!unique[cardId] || unique[cardId].listing) {
-                              unique[cardId] = card;
-                            }
-                            return unique;
-                          }, {})) as any[]
-                      }
+                      {@const setCards = Object.values(set.cards.reduce((unique: any, card: any) => {
+                        const cardId = card.card?.id;
+                        if (!unique[cardId] || unique[cardId].listing) {
+                          unique[cardId] = card;
+                        }
+                        return unique;
+                      }, {}))}
                       
                       <div class="mb-6 border rounded-lg p-4">
                         <div class="flex justify-between items-center mb-3">
@@ -761,13 +1019,7 @@
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {#each setCards as card}
-                            {@const duplicateCount = showDuplicates ? 1 : set.cards.filter((c: any) => c.card?.id === card.card?.id).length}
                             <div class="border border-gray-200 rounded-lg p-3 bg-gray-50 relative">
-                              {#if duplicateCount > 1}
-                                <div class="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-semibold">
-                                  {duplicateCount}
-                                </div>
-                              {/if}
                               <div class="flex items-start justify-between mb-2">
                                 <div class="flex-1">
                                   <h4 class="font-medium text-sm text-gray-900">
@@ -828,13 +1080,7 @@
                     <!-- Single Set - Grid Display -->
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {#each paginatedCards as card}
-                        {@const duplicateCount = showDuplicates ? 1 : cardsBySet[selectedSet]?.cards.filter((c: any) => c.card?.id === card.card?.id).length || 1}
-                        <div class="border border-gray-200 rounded-lg p-3 bg-gray-50 relative">
-                          {#if duplicateCount > 1}
-                            <div class="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-semibold">
-                              {duplicateCount}
-                            </div>
-                          {/if}
+                        <div class="border {card.isMissing ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'} rounded-lg p-3 relative">
                           <div class="flex items-start justify-between mb-2">
                             <div class="flex-1">
                               <h4 class="font-medium text-sm text-gray-900">
@@ -878,7 +1124,9 @@
                             <div class="flex justify-between">
                               <span class="text-gray-500">Status:</span>
                               <span class="text-gray-900">
-                                {#if card.is_listed}
+                                {#if card.isMissing}
+                                  <span class="text-red-600">Missing</span>
+                                {:else if card.is_listed}
                                   <span class="text-green-600">Listed</span>
                                 {:else}
                                   <span class="text-gray-600">Owned</span>
@@ -974,24 +1222,13 @@
                           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Status
                           </th>
-                          {#if !showDuplicates}
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Count
-                            </th>
-                          {/if}
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
                         {#each paginatedCards as card}
-                          {@const duplicateCount = showDuplicates ? 1 : (selectedSet === 'all' 
-                            ? extractedData.profile.digital_cards.filter((c: any) => c.card?.id === card.card?.id).length
-                            : cardsBySet[selectedSet]?.cards.filter((c: any) => c.card?.id === card.card?.id).length || 1)}
-                          {@const allDuplicates = selectedSet === 'all' 
-                            ? extractedData.profile.digital_cards.filter((c: any) => c.card?.id === card.card?.id)
-                            : cardsBySet[selectedSet]?.cards.filter((c: any) => c.card?.id === card.card?.id) || [card]}
                           <tr 
-                            class="hover:bg-gray-50 cursor-pointer"
-                            onclick={() => openCardModal(card, allDuplicates)}
+                            class="{card.isMissing ? 'bg-red-50 hover:bg-red-100 cursor-pointer border-l-4 border-red-400' : 'hover:bg-gray-50 cursor-pointer'}"
+                            onclick={() => openCardModal(card, [card])}
                           >
                             <td class="px-6 py-4 whitespace-nowrap">
                               <div class="flex items-center">
@@ -1020,7 +1257,7 @@
                               </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {card.set?.name || card.card?.set_id || 'Unknown'}
+                              {getSetName(card)}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
@@ -1040,15 +1277,10 @@
                               {/if}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {card.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                                {card.is_listed ? 'Listed' : 'Owned'}
+                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {card.isMissing ? 'bg-red-100 text-red-800' : (card.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')}">
+                                {card.isMissing ? 'Missing' : (card.is_listed ? 'Listed' : 'Owned')}
                               </span>
                             </td>
-                            {#if !showDuplicates}
-                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {duplicateCount > 1 ? duplicateCount : '1'}
-                              </td>
-                            {/if}
                           </tr>
                         {/each}
                       </tbody>
@@ -1444,7 +1676,7 @@
             <dl class="space-y-2 text-sm">
               <div class="flex justify-between">
                 <dt class="text-gray-500">Set:</dt>
-                <dd class="text-gray-900">{selectedCard.set?.name || selectedCard.card?.set_id || 'Unknown'}</dd>
+                <dd class="text-gray-900">{getSetName(selectedCard)}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Rarity:</dt>
@@ -1548,47 +1780,23 @@
           </div>
           
           <!-- Technical Details -->
-          {#if selectedCard.duplicates && selectedCard.duplicates.length > 1}
-            <div class="bg-blue-50 p-4 rounded-lg">
-              <h4 class="font-semibold text-gray-900 mb-3">Owned Copies ({selectedCard.duplicates.length})</h4>
-              <div class="space-y-2 max-h-32 overflow-y-auto">
-                {#each selectedCard.duplicates as duplicate}
-                  <div class="text-sm bg-white p-2 rounded border">
-                    <div class="flex justify-between">
-                      <span class="text-gray-500">Token ID:</span>
-                      <span class="text-gray-900 font-mono">{duplicate.token_id}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-500">Unique ID:</span>
-                      <span class="text-gray-900 font-mono text-xs">{duplicate.unique_id}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-500">Status:</span>
-                      <span class="text-gray-900">
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {duplicate.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                          {duplicate.is_listed ? 'Listed' : 'Owned'}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                {/each}
+          <div class="bg-blue-50 p-4 rounded-lg">
+            <h4 class="font-semibold text-gray-900 mb-3">Technical Details</h4>
+            <dl class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Card ID:</dt>
+                <dd class="text-gray-900 font-mono">{selectedCard.card?.id || selectedCard.id}</dd>
               </div>
-            </div>
-          {:else}
-            <div class="bg-blue-50 p-4 rounded-lg">
-              <h4 class="font-semibold text-gray-900 mb-3">Technical Details</h4>
-              <dl class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <dt class="text-gray-500">Token ID:</dt>
-                  <dd class="text-gray-900 font-mono">{selectedCard.token_id}</dd>
-                </div>
-                <div class="flex justify-between">
-                  <dt class="text-gray-500">Unique ID:</dt>
-                  <dd class="text-gray-900 font-mono text-xs">{selectedCard.unique_id}</dd>
-                </div>
-              </dl>
-            </div>
-          {/if}
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Token ID:</dt>
+                <dd class="text-gray-900 font-mono">{selectedCard.token_id}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Unique ID:</dt>
+                <dd class="text-gray-900 font-mono text-xs">{selectedCard.unique_id}</dd>
+              </div>
+            </dl>
+          </div>
         </div>
       </div>
     </div>
