@@ -9,8 +9,150 @@
   
   // Cards display state
   let selectedSet = $state('all');
-  let viewMode = $state<'grid' | 'table'>('grid');
-  let showDuplicates = $state(true);
+  let viewMode = $state<'grid' | 'table'>('table');
+  let showDuplicates = $state(false);
+  let searchQuery = $state('');
+  let selectedRarity = $state('all');
+  let sortColumn = $state('card_number');
+  let sortDirection = $state<'asc' | 'desc'>('asc');
+  let selectedCard = $state<any>(null);
+  let showCardModal = $state(false);
+  
+  // Pagination state
+  let currentPage = $state(1);
+  let pageSize = $state(50);
+  let pageSizeOptions = [10, 20, 50, 100];
+  
+  // Sorting function
+  function sortCards(cards: any[]) {
+    return [...cards].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortColumn) {
+        case 'card_number':
+          aValue = parseInt(a.card?.card_number || '0');
+          bValue = parseInt(b.card?.card_number || '0');
+          break;
+        case 'name':
+          aValue = a.card?.name || '';
+          bValue = b.card?.name || '';
+          break;
+        case 'set':
+          aValue = a.set?.name || a.card?.set_id || '';
+          bValue = b.set?.name || b.card?.set_id || '';
+          break;
+        case 'rarity':
+          aValue = a.card?.rarity || '';
+          bValue = b.card?.rarity || '';
+          break;
+        case 'type':
+          aValue = a.card?.types?.join(', ') || '';
+          bValue = b.card?.types?.join(', ') || '';
+          break;
+        case 'value':
+          aValue = parseFloat(a.listing?.usd_price || a.card?.raw_price || '0');
+          bValue = parseFloat(b.listing?.usd_price || b.card?.raw_price || '0');
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        const result = aValue.localeCompare(bValue);
+        return sortDirection === 'asc' ? result : -result;
+      } else {
+        const result = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        return sortDirection === 'asc' ? result : -result;
+      }
+    });
+  }
+  
+  // Handle column header clicks for sorting
+  function handleSort(column: string) {
+    if (sortColumn === column) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = column;
+      sortDirection = 'asc';
+    }
+    // Reset to first page when sorting changes
+    currentPage = 1;
+  }
+  
+  // Pagination functions
+  function goToPage(page: number) {
+    currentPage = page;
+  }
+  
+  function goToFirstPage() {
+    currentPage = 1;
+  }
+  
+  function goToLastPage(totalPages: number) {
+    currentPage = totalPages;
+  }
+  
+  function previousPage() {
+    if (currentPage > 1) {
+      currentPage--;
+    }
+  }
+  
+  function nextPage(totalPages: number) {
+    if (currentPage < totalPages) {
+      currentPage++;
+    }
+  }
+  
+  // Handle page size change
+  function handlePageSizeChange(newSize: number) {
+    pageSize = newSize;
+    currentPage = 1; // Reset to first page when page size changes
+  }
+  
+  // Paginate cards
+  function paginateCards(cards: any[]) {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return cards.slice(startIndex, endIndex);
+  }
+  
+  // Filter cards by search query and rarity
+  function filterCards(cards: any[]) {
+    return cards.filter(card => {
+      const matchesSearch = !searchQuery || 
+        (card.card?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (card.card?.card_number || '').includes(searchQuery) ||
+        (card.set?.name || card.card?.set_id || '').toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesRarity = selectedRarity === 'all' || card.card?.rarity === selectedRarity;
+      
+      return matchesSearch && matchesRarity;
+    });
+  }
+  
+  // Reset pagination when filters change
+  $effect(() => {
+    // Access the dependencies to track them
+    searchQuery;
+    selectedRarity;
+    selectedSet;
+    currentPage = 1;
+  });
+  
+  // Handle card click to show modal
+  function openCardModal(card: any, allCardsOfSameType: any[] = []) {
+    selectedCard = {
+      ...card,
+      duplicates: allCardsOfSameType.length > 1 ? allCardsOfSameType : [card]
+    };
+    showCardModal = true;
+  }
+  
+  function closeCardModal() {
+    showCardModal = false;
+    selectedCard = null;
+  }
 
   async function runExtraction() {
     if (!ripUserId.trim()) {
@@ -422,7 +564,7 @@
                   return sets;
                 }, {})}
                 
-                {@const processedCards = showDuplicates 
+                {@const baseCards = showDuplicates 
                   ? (selectedSet === 'all' 
                       ? extractedData.profile.digital_cards 
                       : cardsBySet[selectedSet]?.cards || [])
@@ -442,6 +584,12 @@
                           return unique;
                         }, {})) as any[])
                 }
+                {@const filteredCards = filterCards(baseCards)}
+                {@const sortedCards = sortCards(filteredCards)}
+                {@const totalCards = sortedCards.length}
+                {@const totalPages = Math.ceil(totalCards / pageSize)}
+                {@const paginatedCards = paginateCards(sortedCards)}
+                {@const allRarities = [...new Set(extractedData.profile.digital_cards.map((card: any) => card.card?.rarity).filter(Boolean))].sort()}
                 
               <div class="bg-white shadow rounded-lg p-6">
                 
@@ -450,13 +598,19 @@
                     <h2 class="text-lg font-medium text-gray-900">
                       Digital Cards 
                       <span class="text-base text-gray-500">
-                        ({processedCards.length} {showDuplicates ? 'total' : 'unique'} cards)
+                        (Showing {paginatedCards.length} of {totalCards} {showDuplicates ? 'total' : 'unique'} cards)
                       </span>
                     </h2>
                     
                     <div class="flex flex-wrap items-center gap-3">
                       <div class="text-sm text-gray-500">
-                        Total Value: ${processedCards.reduce((sum: number, card: any) => {
+                        Page Value: ${paginatedCards.reduce((sum: number, card: any) => {
+                          const price = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
+                          return sum + price;
+                        }, 0).toFixed(2)}
+                      </div>
+                      <div class="text-sm text-gray-500">
+                        Total Value: ${sortedCards.reduce((sum: number, card: any) => {
                           const price = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
                           return sum + price;
                         }, 0).toFixed(2)}
@@ -465,61 +619,111 @@
                   </div>
                   
                   <!-- Filters and View Controls -->
-                  <div class="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
-                    <!-- Set Filter -->
-                    <div class="flex-1">
-                      <label for="setFilter" class="block text-sm font-medium text-gray-700 mb-1">
-                        Filter by Set
+                  <div class="space-y-4 p-4 bg-gray-50 rounded-lg">
+                    <!-- Search Bar -->
+                    <div>
+                      <label for="searchCards" class="block text-sm font-medium text-gray-700 mb-1">
+                        Search Cards
                       </label>
-                      <select 
-                        id="setFilter"
-                        bind:value={selectedSet}
+                      <input
+                        type="text"
+                        id="searchCards"
+                        bind:value={searchQuery}
+                        placeholder="Search by name, card number, or set..."
                         class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                      >
-                        <option value="all">All Sets ({extractedData.profile.digital_cards.length} cards)</option>
-                        {#each Object.entries(cardsBySet) as [setName, setData]}
-                          {@const set = setData as any}
-                          <option value={setName}>
-                            {setName} ({set.cards.length} cards)
-                          </option>
-                        {/each}
-                      </select>
+                      />
                     </div>
                     
-                    <!-- View Mode Toggle -->
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-1">
-                        View Mode
-                      </label>
-                      <div class="flex rounded-lg border border-gray-300 overflow-hidden">
-                        <button
-                          onclick={() => viewMode = 'grid'}
-                          class="px-3 py-2 text-sm font-medium {viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    <div class="flex flex-col sm:flex-row gap-4">
+                      <!-- Set Filter -->
+                      <div class="flex-1">
+                        <label for="setFilter" class="block text-sm font-medium text-gray-700 mb-1">
+                          Filter by Set
+                        </label>
+                        <select 
+                          id="setFilter"
+                          bind:value={selectedSet}
+                          class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
-                          Grid
-                        </button>
-                        <button
-                          onclick={() => viewMode = 'table'}
-                          class="px-3 py-2 text-sm font-medium border-l border-gray-300 {viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                        >
-                          Table
-                        </button>
+                          <option value="all">All Sets ({extractedData.profile.digital_cards.length} cards)</option>
+                          {#each Object.entries(cardsBySet) as [setName, setData]}
+                            {@const set = setData as any}
+                            <option value={setName}>
+                              {setName} ({set.cards.length} cards)
+                            </option>
+                          {/each}
+                        </select>
                       </div>
-                    </div>
-                    
-                    <!-- Duplicate Toggle -->
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-1">
-                        Duplicates
-                      </label>
-                      <label class="flex items-center">
-                        <input
-                          type="checkbox"
-                          bind:checked={showDuplicates}
-                          class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
-                        />
-                        <span class="ml-2 text-sm text-gray-700">Show duplicates</span>
-                      </label>
+                      
+                      <!-- Rarity Filter -->
+                      <div class="flex-1">
+                        <label for="rarityFilter" class="block text-sm font-medium text-gray-700 mb-1">
+                          Filter by Rarity
+                        </label>
+                        <select 
+                          id="rarityFilter"
+                          bind:value={selectedRarity}
+                          class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        >
+                          <option value="all">All Rarities</option>
+                          {#each allRarities as rarity}
+                            <option value={rarity}>{rarity}</option>
+                          {/each}
+                        </select>
+                      </div>
+                      
+                      <!-- View Mode Toggle -->
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                          View Mode
+                        </label>
+                        <div class="flex rounded-lg border border-gray-300 overflow-hidden">
+                          <button
+                            onclick={() => viewMode = 'grid'}
+                            class="px-3 py-2 text-sm font-medium {viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                          >
+                            Grid
+                          </button>
+                          <button
+                            onclick={() => viewMode = 'table'}
+                            class="px-3 py-2 text-sm font-medium border-l border-gray-300 {viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                          >
+                            Table
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <!-- Duplicate Toggle -->
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                          Duplicates
+                        </label>
+                        <label class="flex items-center">
+                          <input
+                            type="checkbox"
+                            bind:checked={showDuplicates}
+                            class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
+                          />
+                          <span class="ml-2 text-sm text-gray-700">Show duplicates</span>
+                        </label>
+                      </div>
+                      
+                      <!-- Page Size Selector -->
+                      <div>
+                        <label for="pageSizeSelect" class="block text-sm font-medium text-gray-700 mb-1">
+                          Page Size
+                        </label>
+                        <select 
+                          id="pageSizeSelect"
+                          bind:value={pageSize}
+                          onchange={(e) => handlePageSizeChange(parseInt((e.target as HTMLSelectElement).value))}
+                          class="rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        >
+                          {#each pageSizeOptions as size}
+                            <option value={size}>{size} cards</option>
+                          {/each}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -579,14 +783,11 @@
                                     {/if}
                                   </p>
                                 </div>
-                                {#if card.card?.small_image_url}
-                                  <img 
-                                    src={card.card.small_image_url} 
-                                    alt={card.card?.name} 
-                                    class="w-10 h-14 object-cover rounded border ml-2"
-                                    loading="lazy"
-                                  />
-                                {/if}
+                                <div class="w-10 h-14 bg-gradient-to-br from-blue-100 to-indigo-100 rounded border ml-2 flex items-center justify-center">
+                                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                  </svg>
+                                </div>
                               </div>
                               
                               <div class="space-y-1 text-xs">
@@ -626,7 +827,7 @@
                   {:else}
                     <!-- Single Set - Grid Display -->
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {#each processedCards as card}
+                      {#each paginatedCards as card}
                         {@const duplicateCount = showDuplicates ? 1 : cardsBySet[selectedSet]?.cards.filter((c: any) => c.card?.id === card.card?.id).length || 1}
                         <div class="border border-gray-200 rounded-lg p-3 bg-gray-50 relative">
                           {#if duplicateCount > 1}
@@ -649,14 +850,11 @@
                                 {/if}
                               </p>
                             </div>
-                            {#if card.card?.small_image_url}
-                              <img 
-                                src={card.card.small_image_url} 
-                                alt={card.card?.name} 
-                                class="w-10 h-14 object-cover rounded border ml-2"
-                                loading="lazy"
-                              />
-                            {/if}
+                            <div class="w-10 h-14 bg-gradient-to-br from-blue-100 to-indigo-100 rounded border ml-2 flex items-center justify-center">
+                              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                              </svg>
+                            </div>
                           </div>
                           
                           <div class="space-y-1 text-xs">
@@ -694,27 +892,84 @@
                   {/if}
                 {:else}
                   <!-- Table View -->
+                  <div class="mb-2">
+                    <p class="text-sm text-gray-600">
+                      💡 Click on any row to view detailed card information and high-resolution images
+                    </p>
+                  </div>
                   <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                       <thead class="bg-gray-50">
                         <tr>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Card
+                          <th 
+                            scope="col" 
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                            onclick={() => handleSort('name')}
+                          >
+                            <div class="flex items-center space-x-1">
+                              <span>Card</span>
+                              {#if sortColumn === 'name'}
+                                <span class="text-indigo-600">
+                                  {sortDirection === 'asc' ? '↑' : '↓'}
+                                </span>
+                              {/if}
+                            </div>
                           </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Set
+                          <th 
+                            scope="col" 
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                            onclick={() => handleSort('set')}
+                          >
+                            <div class="flex items-center space-x-1">
+                              <span>Set</span>
+                              {#if sortColumn === 'set'}
+                                <span class="text-indigo-600">
+                                  {sortDirection === 'asc' ? '↑' : '↓'}
+                                </span>
+                              {/if}
+                            </div>
                           </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Rarity
+                          <th 
+                            scope="col" 
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                            onclick={() => handleSort('rarity')}
+                          >
+                            <div class="flex items-center space-x-1">
+                              <span>Rarity</span>
+                              {#if sortColumn === 'rarity'}
+                                <span class="text-indigo-600">
+                                  {sortDirection === 'asc' ? '↑' : '↓'}
+                                </span>
+                              {/if}
+                            </div>
                           </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Type
+                          <th 
+                            scope="col" 
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                            onclick={() => handleSort('type')}
+                          >
+                            <div class="flex items-center space-x-1">
+                              <span>Type</span>
+                              {#if sortColumn === 'type'}
+                                <span class="text-indigo-600">
+                                  {sortDirection === 'asc' ? '↑' : '↓'}
+                                </span>
+                              {/if}
+                            </div>
                           </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            HP
-                          </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Value
+                          <th 
+                            scope="col" 
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                            onclick={() => handleSort('value')}
+                          >
+                            <div class="flex items-center space-x-1">
+                              <span>Value</span>
+                              {#if sortColumn === 'value'}
+                                <span class="text-indigo-600">
+                                  {sortDirection === 'asc' ? '↑' : '↓'}
+                                </span>
+                              {/if}
+                            </div>
                           </th>
                           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Status
@@ -727,21 +982,33 @@
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-gray-200">
-                        {#each processedCards as card}
+                        {#each paginatedCards as card}
                           {@const duplicateCount = showDuplicates ? 1 : (selectedSet === 'all' 
                             ? extractedData.profile.digital_cards.filter((c: any) => c.card?.id === card.card?.id).length
                             : cardsBySet[selectedSet]?.cards.filter((c: any) => c.card?.id === card.card?.id).length || 1)}
-                          <tr class="hover:bg-gray-50">
+                          {@const allDuplicates = selectedSet === 'all' 
+                            ? extractedData.profile.digital_cards.filter((c: any) => c.card?.id === card.card?.id)
+                            : cardsBySet[selectedSet]?.cards.filter((c: any) => c.card?.id === card.card?.id) || [card]}
+                          <tr 
+                            class="hover:bg-gray-50 cursor-pointer"
+                            onclick={() => openCardModal(card, allDuplicates)}
+                          >
                             <td class="px-6 py-4 whitespace-nowrap">
                               <div class="flex items-center">
-                                {#if card.card?.small_image_url}
-                                  <img 
-                                    src={card.card.small_image_url} 
-                                    alt={card.card?.name} 
-                                    class="w-8 h-11 object-cover rounded border mr-3"
-                                    loading="lazy"
-                                  />
-                                {/if}
+                                <div class="w-8 h-11 rounded border mr-3 flex items-center justify-center overflow-hidden bg-gray-100">
+                                  {#if card.card?.small_image_url}
+                                    <img 
+                                      src={card.card.small_image_url} 
+                                      alt={card.card?.name || 'Card'} 
+                                      class="w-full h-full object-cover rounded"
+                                      loading="lazy"
+                                    />
+                                  {:else}
+                                    <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                  {/if}
+                                </div>
                                 <div>
                                   <div class="text-sm font-medium text-gray-900">
                                     {card.card?.name || 'Unknown Card'}
@@ -762,9 +1029,6 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {card.card?.types?.join(', ') || 'Unknown'}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {card.card?.hp || '—'}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {#if card.listing}
@@ -789,6 +1053,70 @@
                         {/each}
                       </tbody>
                     </table>
+                  </div>
+                  
+                  <!-- Pagination Controls -->
+                  <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50 px-4 py-3 rounded-lg">
+                    <!-- Pagination Info -->
+                    <div class="text-sm text-gray-700">
+                      Showing page {currentPage} of {totalPages} 
+                      ({((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalCards)} of {totalCards} cards)
+                    </div>
+                    
+                    <!-- Pagination Buttons -->
+                    <div class="flex items-center space-x-2">
+                      <!-- First Page -->
+                      <button
+                        onclick={goToFirstPage}
+                        disabled={currentPage === 1}
+                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ««
+                      </button>
+                      
+                      <!-- Previous Page -->
+                      <button
+                        onclick={previousPage}
+                        disabled={currentPage === 1}
+                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ‹ Prev
+                      </button>
+                      
+                      <!-- Page Numbers -->
+                      {#each Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const start = Math.max(1, currentPage - 2);
+                        const end = Math.min(totalPages, start + 4);
+                        return start + i;
+                      }).filter(page => page <= totalPages) as page}
+                        <button
+                          onclick={() => goToPage(page)}
+                          class="px-3 py-2 text-sm font-medium {currentPage === page 
+                            ? 'text-indigo-600 bg-indigo-50 border-indigo-500' 
+                            : 'text-gray-500 bg-white border-gray-300 hover:bg-gray-50'} border rounded-md"
+                        >
+                          {page}
+                        </button>
+                      {/each}
+                      
+                      <!-- Next Page -->
+                      <button
+                        onclick={() => nextPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next ›
+                      </button>
+                      
+                      <!-- Last Page -->
+                      <button
+                        onclick={() => goToLastPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        »»
+                      </button>
+                    </div>
                   </div>
                 {/if}
               </div>
@@ -1047,3 +1375,222 @@
     {/if}
   </div>
 </div>
+
+<!-- Card Detail Modal -->
+{#if showCardModal && selectedCard}
+  <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" onclick={closeCardModal}>
+    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white" onclick={(e) => e.stopPropagation()}>
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-900">
+          {selectedCard.card?.name || 'Unknown Card'}
+          {#if selectedCard.card?.card_number}
+            <span class="text-gray-500">#{selectedCard.card.card_number}</span>
+          {/if}
+        </h3>
+        <button onclick={closeCardModal} class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Card Image -->
+        <div class="flex flex-col items-center">
+          {#if selectedCard.card?.large_image_url}
+            <div class="relative group">
+              <img 
+                src={selectedCard.card.large_image_url} 
+                alt={selectedCard.card?.name} 
+                class="max-w-full h-auto rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+                onclick={() => window.open(selectedCard.card.large_image_url, '_blank')}
+              />
+              <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all flex items-center justify-center">
+                <div class="opacity-0 group-hover:opacity-100 bg-white bg-opacity-90 px-3 py-1 rounded-full text-sm text-gray-800 transition-opacity">
+                  Click to enlarge
+                </div>
+              </div>
+            </div>
+          {:else if selectedCard.card?.small_image_url}
+            <div class="relative group">
+              <img 
+                src={selectedCard.card.small_image_url} 
+                alt={selectedCard.card?.name} 
+                class="max-w-full h-auto rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+                onclick={() => window.open(selectedCard.card.small_image_url, '_blank')}
+              />
+              <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all flex items-center justify-center">
+                <div class="opacity-0 group-hover:opacity-100 bg-white bg-opacity-90 px-3 py-1 rounded-full text-sm text-gray-800 transition-opacity">
+                  Click to enlarge
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div class="w-64 h-96 bg-gray-200 rounded-lg flex items-center justify-center">
+              <span class="text-gray-500">No Image Available</span>
+            </div>
+          {/if}
+          <p class="text-xs text-gray-500 mt-2 text-center">
+            {selectedCard.card?.large_image_url ? 'High resolution image' : 'Standard resolution image'}
+          </p>
+        </div>
+        
+        <!-- Card Details -->
+        <div class="space-y-4">
+          <!-- Basic Info -->
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-semibold text-gray-900 mb-3">Card Information</h4>
+            <dl class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Set:</dt>
+                <dd class="text-gray-900">{selectedCard.set?.name || selectedCard.card?.set_id || 'Unknown'}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Rarity:</dt>
+                <dd class="text-gray-900">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    {selectedCard.card?.rarity || 'Unknown'}
+                  </span>
+                </dd>
+              </div>
+              {#if selectedCard.card?.types?.length}
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">Type:</dt>
+                  <dd class="text-gray-900">{selectedCard.card.types.join(', ')}</dd>
+                </div>
+              {/if}
+              {#if selectedCard.card?.hp}
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">HP:</dt>
+                  <dd class="text-gray-900">{selectedCard.card.hp}</dd>
+                </div>
+              {/if}
+              {#if selectedCard.card?.supertype}
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">Supertype:</dt>
+                  <dd class="text-gray-900">{selectedCard.card.supertype}</dd>
+                </div>
+              {/if}
+              {#if selectedCard.card?.subtype?.length}
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">Subtype:</dt>
+                  <dd class="text-gray-900">{selectedCard.card.subtype.join(', ')}</dd>
+                </div>
+              {/if}
+            </dl>
+          </div>
+          
+          <!-- Card Features -->
+          {#if selectedCard.card?.is_reverse || selectedCard.card?.is_holo || selectedCard.card?.is_first_edition || selectedCard.card?.is_shadowless || selectedCard.card?.is_unlimited || selectedCard.card?.is_promo}
+            <div class="bg-purple-50 p-4 rounded-lg">
+              <h4 class="font-semibold text-gray-900 mb-3">Special Features</h4>
+              <div class="flex flex-wrap gap-2">
+                {#if selectedCard.card?.is_reverse}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    🔄 Reverse Holo
+                  </span>
+                {/if}
+                {#if selectedCard.card?.is_holo}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rainbow-100 text-rainbow-800 bg-gradient-to-r from-pink-100 to-blue-100">
+                    ✨ Holographic
+                  </span>
+                {/if}
+                {#if selectedCard.card?.is_first_edition}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    🥇 First Edition
+                  </span>
+                {/if}
+                {#if selectedCard.card?.is_shadowless}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    👤 Shadowless
+                  </span>
+                {/if}
+                {#if selectedCard.card?.is_unlimited}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    ♾️ Unlimited
+                  </span>
+                {/if}
+                {#if selectedCard.card?.is_promo}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    🎁 Promo
+                  </span>
+                {/if}
+              </div>
+            </div>
+          {/if}
+          
+          <!-- Market Info -->
+          <div class="bg-green-50 p-4 rounded-lg">
+            <h4 class="font-semibold text-gray-900 mb-3">Market Information</h4>
+            <dl class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Status:</dt>
+                <dd class="text-gray-900">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {selectedCard.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                    {selectedCard.is_listed ? 'Listed' : 'Owned'}
+                  </span>
+                </dd>
+              </div>
+              {#if selectedCard.listing?.usd_price}
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">Listed Price:</dt>
+                  <dd class="text-green-600 font-semibold">${selectedCard.listing.usd_price}</dd>
+                </div>
+              {/if}
+              {#if selectedCard.card?.raw_price}
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">Market Value:</dt>
+                  <dd class="text-gray-900">${selectedCard.card.raw_price}</dd>
+                </div>
+              {/if}
+            </dl>
+          </div>
+          
+          <!-- Technical Details -->
+          {#if selectedCard.duplicates && selectedCard.duplicates.length > 1}
+            <div class="bg-blue-50 p-4 rounded-lg">
+              <h4 class="font-semibold text-gray-900 mb-3">Owned Copies ({selectedCard.duplicates.length})</h4>
+              <div class="space-y-2 max-h-32 overflow-y-auto">
+                {#each selectedCard.duplicates as duplicate}
+                  <div class="text-sm bg-white p-2 rounded border">
+                    <div class="flex justify-between">
+                      <span class="text-gray-500">Token ID:</span>
+                      <span class="text-gray-900 font-mono">{duplicate.token_id}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-500">Unique ID:</span>
+                      <span class="text-gray-900 font-mono text-xs">{duplicate.unique_id}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-500">Status:</span>
+                      <span class="text-gray-900">
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {duplicate.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                          {duplicate.is_listed ? 'Listed' : 'Owned'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {:else}
+            <div class="bg-blue-50 p-4 rounded-lg">
+              <h4 class="font-semibold text-gray-900 mb-3">Technical Details</h4>
+              <dl class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">Token ID:</dt>
+                  <dd class="text-gray-900 font-mono">{selectedCard.token_id}</dd>
+                </div>
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">Unique ID:</dt>
+                  <dd class="text-gray-900 font-mono text-xs">{selectedCard.unique_id}</dd>
+                </div>
+              </dl>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
