@@ -7,8 +7,8 @@
     </p>
   </div>
 
-  <div class="max-w-4xl mx-auto">
-    <div class="grid md:grid-cols-2 gap-8">
+  <div class="max-w-6xl mx-auto">
+    <div class="grid md:grid-cols-3 gap-8">
       <div class="bg-white rounded-lg shadow-md p-6">
         <h2 class="text-2xl font-semibold text-gray-900 mb-4">Extract Profile Data</h2>
         <p class="text-gray-600 mb-6">
@@ -19,6 +19,19 @@
           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
         >
           Start Extracting
+        </a>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-2 border-green-200">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">🔄 Trade Finder</h2>
+        <p class="text-gray-600 mb-6">
+          Compare two users to find perfect trading opportunities. See which cards you can trade with each other for mutual benefit!
+        </p>
+        <a 
+          href="/trade-finder" 
+          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+        >
+          Find Trades
         </a>
       </div>
 
