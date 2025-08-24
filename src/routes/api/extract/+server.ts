@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { fetchHTML } from '$lib/server/services/fetcher.js';
 import { extractSvelteKitData, sanitizeExtractedData, extractFromRipFunAPI } from '$lib/server/services/parser.js';
 import { cleanRipFunData } from '$lib/server/services/normalizer.js';
+import { userSyncService } from '$lib/server/services/userSync.js';
 import type { RequestHandler } from './$types.js';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -12,8 +13,41 @@ export const POST: RequestHandler = async ({ request }) => {
       return json({ error: 'Username is required' }, { status: 400 });
     }
     
-    const trimmedUsername = username.trim();
-    const targetUrl = `https://www.rip.fun/profile/${trimmedUsername}`;
+    const trimmedInput = username.trim();
+    let resolvedUsername = trimmedInput;
+    let resolvedUserId: number | null = null;
+    let resolutionMethod = 'direct';
+    
+    // Check if input is a number (user ID) or username
+    const isNumericId = /^\d+$/.test(trimmedInput);
+    
+    if (!isNumericId) {
+      // Input appears to be a username, try to resolve it to user ID
+      try {
+        console.log(`Attempting to resolve username: ${trimmedInput}`);
+        const userData = await userSyncService.getUserByUsername(trimmedInput);
+        
+        if (userData) {
+          resolvedUserId = userData.id;
+          resolvedUsername = userData.username;
+          resolutionMethod = 'database';
+          console.log(`Username resolved: ${trimmedInput} -> ID: ${resolvedUserId}`);
+        } else {
+          console.log(`Username not found in database: ${trimmedInput}, using as direct username`);
+          // Will use input directly as rip.fun username
+        }
+      } catch (error) {
+        console.warn(`Username resolution failed for ${trimmedInput}:`, error);
+        // Continue with direct username approach
+      }
+    } else {
+      // Input is numeric, treat as user ID
+      resolvedUserId = parseInt(trimmedInput);
+      resolutionMethod = 'numeric';
+      console.log(`Using numeric input as user ID: ${resolvedUserId}`);
+    }
+    
+    const targetUrl = `https://www.rip.fun/profile/${resolvedUsername}`;
     let extractedData;
     let extractionMethod = 'unknown';
     let apiCallsMade = 0;
@@ -21,8 +55,10 @@ export const POST: RequestHandler = async ({ request }) => {
     // Try API extraction first (preferred method for complete data)
     if (method === 'auto' || method === 'api') {
       try {
-        console.log(`Attempting API extraction for user: ${trimmedUsername}`);
-        extractedData = await extractFromRipFunAPI(trimmedUsername);
+        console.log(`Attempting API extraction for user: ${resolvedUsername} (ID: ${resolvedUserId || 'unknown'})`);
+        // Use resolvedUserId if available, otherwise fall back to resolvedUsername (for numeric inputs)
+        const extractionTarget = resolvedUserId ? resolvedUserId.toString() : resolvedUsername;
+        extractedData = await extractFromRipFunAPI(extractionTarget);
         extractionMethod = 'api';
         apiCallsMade = extractedData.api_calls_made || 0;
         
@@ -47,7 +83,7 @@ export const POST: RequestHandler = async ({ request }) => {
     // Fall back to HTML parsing if API extraction failed or wasn't attempted
     if (!extractedData && (method === 'auto' || method === 'html')) {
       try {
-        console.log(`Attempting HTML extraction for user: ${trimmedUsername}`);
+        console.log(`Attempting HTML extraction for user: ${resolvedUsername} (ID: ${resolvedUserId || 'unknown'})`);
         
         // Use longer timeouts for rip.fun profiles which can be data-heavy
         const html = await fetchHTML(targetUrl, {
@@ -76,7 +112,10 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     
     return json({
-      username: trimmedUsername,
+      username: resolvedUsername,
+      originalInput: trimmedInput,
+      resolvedUserId,
+      resolutionMethod,
       targetUrl,
       extractedData,
       extractionMethod,

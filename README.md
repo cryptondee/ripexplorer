@@ -1,8 +1,17 @@
 # rip.fun Data Extractor
 
-A robust web application specifically designed to extract complete profile data from rip.fun user pages. The app fetches HTML from rip.fun profiles, parses the SvelteKit data structure, automatically removes clip_embedding data to reduce payload size, and provides clean JSON output with advanced card filtering, set-based organization, and comprehensive visualization of profile information, digital cards, packs, and statistics.
+A robust web application specifically designed to extract complete profile data from rip.fun user pages with intelligent username-to-ID resolution. The app features blockchain-powered username bridging, fetches HTML from rip.fun profiles, parses the SvelteKit data structure, automatically removes clip_embedding data to reduce payload size, and provides clean JSON output with advanced card filtering, missing cards marketplace integration, localStorage caching, and comprehensive visualization of profile information, digital cards, packs, and statistics.
 
 ## ✨ Key Features
+
+### 🔗 Username Bridging System
+- **Smart Username Resolution**: Input usernames instead of numeric user IDs for seamless user experience
+- **Blockchain Integration**: Alchemy-powered blockchain scanning of rip.fun smart contract interactions
+- **Automatic User Discovery**: Syncs user data from Base blockchain pack purchase events
+- **Database Mapping**: Persistent storage of address-to-username mappings with block number tracking
+- **Real-time User Search**: Autocomplete functionality with partial username matching
+- **Sync Status Tracking**: Background synchronization with progress monitoring and status updates
+- **Dual Input Support**: Accepts both traditional user IDs and human-readable usernames
 
 ### Data Extraction & Processing
 - **Complete Data Extraction**: Extract all profile data, cards, packs, and statistics
@@ -10,66 +19,117 @@ A robust web application specifically designed to extract complete profile data 
 - **SvelteKit Parser**: Advanced parsing of SvelteKit data from JavaScript code
 - **Automatic Filtering**: Removes clip_embedding data while preserving all other information
 - **Reliable Fetching**: Enhanced timeout handling with automatic retry logic and exponential backoff
+- **localStorage Caching**: Smart browser storage with instant loading and cache-first strategy
+- **Missing Cards Integration**: Real-time marketplace data with buy now/make offer functionality
 
 ### User Experience
+- **Instant Loading**: Smart caching system provides immediate data loading for returning users
+- **Cache Status Indicators**: Visual badges showing data source (📦 Cached vs 🌐 Live)
+- **Smart Refresh System**: Refresh button updates user data while preserving static set caches
 - **Intelligent Pack Grouping**: Automatically groups packs by name (e.g., "Black Bolt", "White Flar", "151") with toggleable details
 - **Pack Status Tracking**: Visual summary showing opened, sealed, and pending open counts for each pack category
 - **Progressive Loading**: Real-time status updates during long extractions with helpful timeout guidance
 - **Enhanced Error Handling**: Detailed error messages with troubleshooting suggestions
 - **JSON Export**: Download clean data as JSON files or copy to clipboard
+- **Advanced Cache Management**: Collapsible cache options for power users
 - **Responsive Design**: Clean interface optimized for all device sizes
 
 ### Advanced Card Management & Visualization
 - **Set-Based Card Filtering**: Organize and filter cards by Pokemon TCG sets with real-time count updates
+- **Missing Cards Marketplace Integration**: Complete missing cards detection with real-time listing data
+  - **Show Missing Cards**: Display missing cards alongside owned cards with red styling
+  - **Only Missing Cards**: Filter to show only missing cards from selected sets
+  - **Available Only**: Show only missing cards with active marketplace listings
+- **Buy Now/Make Offer Functionality**: Direct marketplace integration with purchase buttons
 - **Smart Set Recognition**: Automatic parsing of human-readable set names (e.g., "151", "Prismatic Evolutions", "Black Bolt")
-- **Duplicate Management**: Toggle to show/hide duplicate cards with visual count badges
-- **Dual View Modes**: Switch between grid view (visual browsing) and table view (detailed analysis)
-- **Interactive Card Tables**: Sortable columns including name, set, rarity, type, HP, value, and status
+- **Smart Deduplication**: Always-active card deduplication for cleaner display (no user toggle)
+- **Dual View Modes**: Switch between grid view (visual browsing) and table view with marketplace columns
+- **Enhanced Card Tables**: Sortable columns including marketplace data (Listed Price, Available, Action)
+- **Marketplace Columns**:
+  - **Listed Price**: Lowest available price for missing cards
+  - **Available**: ✅/❌ icons showing listing availability  
+  - **Action**: Buy Now (blue) or Make Offer (gray) buttons
 - **Organized Pack Display**: Table view with ID and status columns for each pack group
 - **Collection Analytics**: Set-by-set breakdowns with rarity distribution and value tracking
 - **Status Indicators**: Color-coded badges for listing status, pack conditions, and ownership
-- **Visual Count Badges**: Blue badges showing duplicate card counts and item quantities
+- **Visual Count Badges**: Availability indicators and marketplace status
 
 ## Tech Stack
 
 - **Frontend & Backend**: SvelteKit (full-stack framework)
-- **Database**: SQLite with Prisma ORM
+- **Database**: SQLite with Prisma ORM for user mappings and sync tracking
+- **Blockchain Integration**: Alchemy SDK for Base network interaction
 - **HTML Parsing**: Cheerio for server-side DOM manipulation
 - **Styling**: Tailwind CSS
 - **Type Safety**: TypeScript throughout
 
 ## Setup
 
-1. Install dependencies:
+### Prerequisites
+- Node.js 18+ and npm
+- [Alchemy API account](https://dashboard.alchemy.com/) for blockchain integration
+
+### Installation
+
+1. **Install dependencies** (including Alchemy SDK):
 ```sh
 npm install
+npm install alchemy-sdk
 ```
 
-2. Set up the database:
+2. **Environment Configuration**:
 ```sh
+# Copy the environment template
+cp .env.example .env
+
+# Edit .env and add your Alchemy API key:
+# ALCHEMY_API_KEY=your_actual_api_key_here
+```
+
+3. **Database Setup**:
+```sh
+# Generate Prisma client and set up database schema
 npx prisma generate
 npx prisma db push
 ```
 
-3. Start the development server:
+4. **Start Development Server**:
 ```sh
 npm run dev
 ```
 
-4. Visit `http://localhost:5173` to use the application.
+5. **Visit Application**: Open `http://localhost:5173` to use the application.
+
+### First-Time Username Bridging Setup
+
+After setup, you'll need to sync blockchain data to enable username resolution:
+
+1. **Navigate to Extract Page**: Visit `/extract` in the application
+2. **Trigger Initial Sync**: Click the "Sync Users" button to start blockchain data synchronization
+3. **Monitor Sync Progress**: Check sync status - initial sync may take several minutes
+4. **Start Using Usernames**: Once sync completes, you can input usernames instead of user IDs
 
 ## Usage
 
 1. **Visit Extractor**: Go to `/extract` or click "Start Extracting" from the home page
-2. **Enter Username**: Type any rip.fun username (e.g., "johndoe") 
+2. **Enter Username or ID**: 
+   - **Username Mode**: Type any rip.fun username (e.g., "johndoe") with autocomplete suggestions
+   - **ID Mode**: Enter a numeric user ID directly (traditional method)
+   - **Smart Resolution**: System automatically detects input type and resolves accordingly
 3. **Extract Data**: Click "Extract Profile Data" to start the extraction process
    - Monitor real-time progress updates during extraction
    - Automatic retries handle temporary timeouts or network issues
 4. **Review Results**: Explore the comprehensive data visualization:
    - **Card Management**: Use set-based filtering to organize cards by Pokemon TCG sets
      - Filter dropdown shows all available sets with card counts
-     - Toggle duplicate display to see unique cards or full collection
-     - Switch between grid view (visual) and table view (analytical)
+     - **Missing Cards**: Check "Show missing cards" to see cards you don't own
+     - **Only Missing**: Filter to show only missing cards with marketplace data
+     - **Available Only**: Show only missing cards with active listings
+     - Switch between grid view (visual) and table view with marketplace columns
+   - **Marketplace Integration**: Buy missing cards directly from the interface
+     - **Buy Now**: Blue buttons for cards with active listings
+     - **Make Offer**: Gray buttons for cards without listings  
+     - **Listed Prices**: Real-time marketplace pricing data
    - **Pack Groups**: Click any pack category to expand and see individual pack details
    - **Status Summary**: View opened/sealed/pending counts at the top of each pack group
    - **Collection Overview**: Browse set statistics, card rarities, and total values
@@ -79,11 +139,19 @@ npm run dev
 
 - **Set-Based Organization**: Cards automatically grouped by Pokemon TCG sets (e.g., "151", "Prismatic Evolutions", "Black Bolt")
 - **Smart Filtering**: Dropdown filter with real-time card counts for each set
-- **Duplicate Handling**: Toggle to show all cards or deduplicate with visual count indicators
+- **Missing Cards Integration**: Complete marketplace features for cards you don't own
+  - **Show Missing Cards**: Red-styled missing cards displayed alongside owned cards
+  - **Only Missing Cards**: Dedicated filter to show only missing cards
+  - **Available Only**: Show only missing cards with active marketplace listings
+- **Smart Deduplication**: Always-active card deduplication (no toggle needed)
 - **Dual Display Modes**:
-  - **Grid View**: Visual card browser with images, stats, and duplicate badges
-  - **Table View**: Comprehensive data table with sortable columns (name, set, rarity, type, HP, value, status)
-- **Visual Indicators**: Blue count badges for duplicates, color-coded status indicators for listings
+  - **Grid View**: Visual card browser with images, stats, and missing card indicators
+  - **Table View**: Enhanced data table with marketplace columns (Card, Set, Rarity, Type, Value, Listed Price, Available, Action, Status)
+- **Marketplace Integration**:
+  - **Listed Price**: Real-time lowest prices for missing cards
+  - **Availability Icons**: ✅ for available, ❌ for unavailable missing cards
+  - **Buy Now/Make Offer**: Direct purchase buttons linking to rip.fun marketplace
+- **Visual Indicators**: Availability status, color-coded indicators, marketplace integration
 - **Responsive Design**: Optimized layouts for both desktop and mobile viewing
 
 ### 🎯 Pack Management Features
@@ -111,14 +179,23 @@ The application extracts and displays comprehensive data from rip.fun profiles:
 
 **Digital Cards (Advanced Management):**
 - **Set-Based Organization**: Cards automatically grouped by Pokemon TCG sets with human-readable names
-- **Filtering System**: Dropdown filter to show all sets or specific set collections
-- **Duplicate Management**: Smart deduplication with visual count badges for identical cards
-- **Dual View Modes**: Grid view for visual browsing, table view for detailed analysis
+- **Missing Cards Marketplace Integration**: Complete marketplace features for cards not owned
+  - **Real-Time Listing Data**: Live pricing from rip.fun marketplace API
+  - **Buy Now Functionality**: Direct purchase buttons for available cards
+  - **Make Offer Links**: Marketplace links for cards without active listings
+  - **Availability Tracking**: Visual indicators for listing availability
+- **Advanced Filtering System**: 
+  - **Set-Based Filter**: Dropdown to show all sets or specific collections
+  - **Show Missing Cards**: Display missing cards alongside owned cards
+  - **Only Missing Cards**: Filter to show only missing cards
+  - **Available Only**: Show only missing cards with active listings
+- **Smart Deduplication**: Always-active intelligent deduplication (no user toggle)
+- **Dual View Modes**: Grid view for visual browsing, table view with marketplace columns
 - **Complete Card Details**: Name, card number, rarity, HP, types, abilities, attacks, weaknesses, resistances
-- **Market Data**: Values, listing prices, and marketplace status
+- **Enhanced Market Data**: Owned card values, missing card listing prices, and marketplace status
 - **Visual Assets**: Card images, artwork, and set symbols
 - **Set Information**: Release dates, set statistics, and rarity distributions
-- **Interactive Tables**: Sortable columns with comprehensive card data
+- **Interactive Tables**: Enhanced sortable columns including marketplace data (Listed Price, Available, Action)
 
 **Digital Products & Packs (Enhanced Display):**
 - **Grouped Pack View**: Packs automatically organized by name/type
@@ -141,6 +218,15 @@ The application automatically removes `clip_embedding` data from the extracted i
 
 ## 🔧 Reliability & Performance
 
+### localStorage Caching System
+- **Instant Loading**: Cache-first strategy provides immediate data loading
+- **User-Specific Caching**: Individual user data cached separately with timestamps
+- **Set Data Caching**: Pokemon TCG set data cached permanently (shared across users)
+- **Smart Refresh Logic**: Refresh button updates user data while preserving set caches
+- **Cache Status Indicators**: Visual badges showing data source (📦 Cached vs 🌐 Live)
+- **Advanced Cache Management**: Power user options to clear specific cache types
+- **Cross-User Efficiency**: Set data shared between different user profiles
+
 ### Enhanced Fetching System
 - **Automatic Retries**: Up to 3 retry attempts with exponential backoff
 - **Progressive Timeouts**: Starts at 20s, increases to 60s maximum
@@ -156,12 +242,26 @@ The application automatically removes `clip_embedding` data from the extracted i
 
 ## API Endpoints
 
-- `POST /api/extract` - Extract complete data from rip.fun username (Enhanced with retry logic)
+### Core Extraction
+- `POST /api/extract` - Extract complete data from rip.fun username or user ID (Enhanced with retry logic and username resolution)
+
+### Username Bridging System
+- `POST /api/sync-users` - Trigger blockchain user synchronization from Base network
+- `GET /api/sync-users` - Get current sync status and progress information
+- `GET /api/resolve-username/[username]` - Resolve username to user ID and profile data
+- `GET /api/search-users?q=[query]&limit=[n]` - Search users with autocomplete functionality
+
+### Missing Cards & Marketplace Integration  
+- `GET /api/set/[setId]` - Fetch complete Pokemon TCG set data (cached permanently)
+- `GET /api/card/[cardId]/listings` - Get real-time marketplace listings for missing cards
+
+### Legacy Profile Management
 - `GET /api/profiles` - List all profiles (legacy feature)
 - `POST /api/profiles` - Create a new profile (legacy feature)
 - `GET /api/profiles/[id]` - Get a specific profile (legacy feature)
 - `PUT /api/profiles/[id]` - Update a profile (legacy feature)
 - `DELETE /api/profiles/[id]` - Delete a profile (legacy feature)
+- `POST /api/compare` - Compare profiles (legacy feature)
 
 ## Building
 

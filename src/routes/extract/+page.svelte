@@ -122,6 +122,11 @@
   }
 
   let ripUserId = $state('');
+  let searchResults = $state<any[]>([]);
+  let showSearchResults = $state(false);
+  let searchLoading = $state(false);
+  let syncStatus = $state<any>(null);
+  let syncLoading = $state(false);
   let extractedData = $state<any>(null);
   let loading = $state(false);
   let error = $state('');
@@ -688,6 +693,100 @@
       console.log('Copied to clipboard');
     });
   }
+
+  // Username search functionality
+  let searchTimeout: number;
+  
+  function handleUsernameInput() {
+    clearTimeout(searchTimeout);
+    
+    if (ripUserId.trim().length < 2) {
+      searchResults = [];
+      showSearchResults = false;
+      return;
+    }
+    
+    searchTimeout = setTimeout(async () => {
+      await searchUsers(ripUserId.trim());
+    }, 300);
+  }
+  
+  async function searchUsers(query: string) {
+    try {
+      searchLoading = true;
+      const response = await fetch(`/api/search-users?q=${encodeURIComponent(query)}&limit=5`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        searchResults = data.results;
+        showSearchResults = true;
+      } else {
+        searchResults = [];
+        showSearchResults = false;
+      }
+    } catch (err) {
+      console.warn('User search failed:', err);
+      searchResults = [];
+      showSearchResults = false;
+    } finally {
+      searchLoading = false;
+    }
+  }
+  
+  function selectUser(user: any) {
+    ripUserId = user.username;
+    showSearchResults = false;
+    searchResults = [];
+  }
+  
+  function hideSearchResults() {
+    setTimeout(() => {
+      showSearchResults = false;
+    }, 200);
+  }
+
+  // Sync functionality
+  async function triggerSync() {
+    try {
+      syncLoading = true;
+      const response = await fetch('/api/sync-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Sync started:', data);
+        await checkSyncStatus();
+      } else {
+        const errorData = await response.json();
+        console.error('Sync failed:', errorData);
+      }
+    } catch (err) {
+      console.error('Sync request failed:', err);
+    } finally {
+      syncLoading = false;
+    }
+  }
+  
+  async function checkSyncStatus() {
+    try {
+      const response = await fetch('/api/sync-users');
+      if (response.ok) {
+        const data = await response.json();
+        syncStatus = data;
+      }
+    } catch (err) {
+      console.warn('Failed to check sync status:', err);
+    }
+  }
+  
+  // Check sync status on component mount
+  $effect(() => {
+    checkSyncStatus();
+  });
 </script>
 
 <div class="px-4 py-8">
@@ -704,25 +803,100 @@
         <h2 class="text-lg font-medium text-gray-900 mb-4">Extract Profile Data</h2>
         
         <div class="space-y-4">
-          <div>
+          <div class="relative">
             <label for="ripUsername" class="block text-sm font-medium text-gray-700">
-              rip.fun Username
+              rip.fun Username or User ID
             </label>
             <div class="mt-1 flex rounded-md shadow-sm">
               <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                https://www.rip.fun/profile/
+                👤
               </span>
               <input
                 type="text"
                 id="ripUsername"
                 bind:value={ripUserId}
+                oninput={handleUsernameInput}
+                onblur={hideSearchResults}
                 class="block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                placeholder="user ID (e.g., 2010)"
+                placeholder="username (e.g., Poketard) or user ID (e.g., 2010)"
+                autocomplete="off"
               />
             </div>
-            <p class="mt-1 text-sm text-gray-500">
-              Enter a rip.fun user ID to extract their complete card collection. Examples: 2010 (ndw), 1169 (cryptondee). This uses the direct API for all cards.
-            </p>
+            
+            <!-- Search Results Dropdown -->
+            {#if showSearchResults && (searchResults.length > 0 || searchLoading)}
+              <div class="absolute z-10 mt-1 w-full bg-white shadow-lg border border-gray-300 rounded-md max-h-60 overflow-auto">
+                {#if searchLoading}
+                  <div class="px-4 py-3 text-sm text-gray-500">
+                    <div class="flex items-center">
+                      <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Searching...
+                    </div>
+                  </div>
+                {:else if searchResults.length > 0}
+                  {#each searchResults as user}
+                    <button
+                      onmousedown={() => selectUser(user)}
+                      class="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                    >
+                      <div class="flex items-center space-x-3">
+                        {#if user.avatar}
+                          <img src={user.avatar} alt={user.username} class="w-8 h-8 rounded-full">
+                        {:else}
+                          <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                            <span class="text-xs text-gray-500">👤</span>
+                          </div>
+                        {/if}
+                        <div class="flex-1 min-w-0">
+                          <p class="text-sm font-medium text-gray-900 truncate">{user.username}</p>
+                          <p class="text-xs text-gray-500">ID: {user.id}</p>
+                        </div>
+                      </div>
+                    </button>
+                  {/each}
+                {:else}
+                  <div class="px-4 py-3 text-sm text-gray-500">
+                    No users found. Try running a sync to update the database.
+                  </div>
+                {/if}
+              </div>
+            {/if}
+            
+            <div class="mt-2 flex justify-between items-start">
+              <p class="text-sm text-gray-500">
+                Enter a username (e.g., "Poketard") or user ID (e.g., "2010") to extract their complete card collection.
+              </p>
+              
+              <!-- Sync Button -->
+              <div class="flex items-center space-x-2">
+                {#if syncStatus}
+                  <span class="text-xs text-gray-500">
+                    Last sync: {syncStatus.status === 'never_run' ? 'Never' : new Date(syncStatus.lastSyncAt).toLocaleDateString()}
+                  </span>
+                {/if}
+                <button
+                  onclick={triggerSync}
+                  disabled={syncLoading}
+                  class="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  title="Sync blockchain data to update username database"
+                >
+                  {#if syncLoading}
+                    <svg class="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  {:else}
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                  {/if}
+                  Sync
+                </button>
+              </div>
+            </div>
           </div>
 
           {#if error}
