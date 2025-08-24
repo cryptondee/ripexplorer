@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import TradeTable from '$lib/components/TradeTable.svelte';
+  import UserSearchInput from '$lib/components/UserSearchInput.svelte';
   
   let userA = '';
   let userB = '';
@@ -18,66 +20,6 @@
   let availableRarities: string[] = [];
   let totalPages = 1;
 
-  // Search functionality for usernames
-  let searchResultsA: any[] = [];
-  let searchResultsB: any[] = [];
-  let showSearchA = false;
-  let showSearchB = false;
-  let searchLoadingA = false;
-  let searchLoadingB = false;
-
-  async function searchUsers(query: string, forUserA: boolean = true): Promise<void> {
-    if (query.length < 2) {
-      if (forUserA) {
-        searchResultsA = [];
-        showSearchA = false;
-      } else {
-        searchResultsB = [];
-        showSearchB = false;
-      }
-      return;
-    }
-
-    if (forUserA) {
-      searchLoadingA = true;
-    } else {
-      searchLoadingB = true;
-    }
-
-    try {
-      const response = await fetch(`/api/search-users?q=${encodeURIComponent(query)}&limit=5`);
-      if (response.ok) {
-        const data = await response.json();
-        if (forUserA) {
-          searchResultsA = data.results;
-          showSearchA = true;
-        } else {
-          searchResultsB = data.results;
-          showSearchB = true;
-        }
-      }
-    } catch (err) {
-      console.warn('User search failed:', err);
-    } finally {
-      if (forUserA) {
-        searchLoadingA = false;
-      } else {
-        searchLoadingB = false;
-      }
-    }
-  }
-
-  function selectUser(user: any, forUserA: boolean = true): void {
-    if (forUserA) {
-      userA = user.username;
-      showSearchA = false;
-      searchResultsA = [];
-    } else {
-      userB = user.username;
-      showSearchB = false;
-      searchResultsB = [];
-    }
-  }
 
   async function compareUsers(): Promise<void> {
     if (!userA || !userB) {
@@ -228,45 +170,7 @@
     }).format(amount);
   }
 
-  function getRowHighlighting(trade: any): string {
-    // Only highlight rows for 'give' trades where userA is giving away cards
-    if (trade.tradeType === 'give' && trade.userACount > 0) {
-      if (trade.userACount === 1) {
-        return 'cursor-pointer'; // Will use inline styles for orange
-      } else {
-        return 'cursor-pointer'; // Will use inline styles for green
-      }
-    }
-    return 'hover:bg-gray-50 cursor-pointer'; // Default styling
-  }
 
-  function getRowStyle(trade: any): string {
-    // Only highlight rows for 'give' trades where userA is giving away cards
-    if (trade.tradeType === 'give' && trade.userACount > 0) {
-      if (trade.userACount === 1) {
-        return 'background-color: #fed7aa; border-left: 4px solid #ea580c;'; // Single card - orange
-      } else {
-        return 'background-color: #bbf7d0; border-left: 4px solid #16a34a;'; // Duplicate - green
-      }
-    }
-    return ''; // Default styling
-  }
-
-  // Close search dropdowns when clicking outside
-  function handleClickOutside(event: MouseEvent): void {
-    const target = event.target as Element;
-    if (!target.closest('.search-container')) {
-      showSearchA = false;
-      showSearchB = false;
-    }
-  }
-
-  onMount(() => {
-    document.addEventListener('click', handleClickOutside);
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
-  });
 </script>
 
 <svelte:head>
@@ -287,86 +191,20 @@
     <div class="bg-white rounded-lg shadow-md p-8 mb-12">
       <div class="grid md:grid-cols-2 gap-8">
         <!-- User A Input -->
-        <div class="search-container relative">
-          <label for="userA" class="block text-sm font-medium text-gray-700 mb-2">
-            First User (Username or ID)
-          </label>
-          <input
-            type="text"
-            id="userA"
-            bind:value={userA}
-            on:input={() => searchUsers(userA, true)}
-            placeholder="Enter username..."
-            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          
-          {#if searchLoadingA}
-            <div class="absolute right-3 top-9">
-              <div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-            </div>
-          {/if}
-          
-          {#if showSearchA && searchResultsA.length > 0}
-            <div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
-              {#each searchResultsA as user}
-                <button
-                  type="button"
-                  class="w-full px-4 py-2 text-left hover:bg-gray-100 border-b border-gray-200 last:border-b-0"
-                  on:click={() => selectUser(user, true)}
-                >
-                  <div class="flex items-center space-x-3">
-                    {#if user.avatar}
-                      <img src={user.avatar} alt="" class="w-6 h-6 rounded-full" />
-                    {/if}
-                    <span class="font-medium">{user.username}</span>
-                    <span class="text-sm text-gray-500">ID: {user.id}</span>
-                  </div>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
+        <UserSearchInput
+          bind:value={userA}
+          label="First User (Username or ID)"
+          placeholder="Enter username..."
+          on:change={() => {}}
+        />
 
         <!-- User B Input -->
-        <div class="search-container relative">
-          <label for="userB" class="block text-sm font-medium text-gray-700 mb-2">
-            Second User (Username or ID)
-          </label>
-          <input
-            type="text"
-            id="userB"
-            bind:value={userB}
-            on:input={() => searchUsers(userB, false)}
-            placeholder="Enter username..."
-            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          
-          {#if searchLoadingB}
-            <div class="absolute right-3 top-9">
-              <div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-            </div>
-          {/if}
-          
-          {#if showSearchB && searchResultsB.length > 0}
-            <div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
-              {#each searchResultsB as user}
-                <button
-                  type="button"
-                  class="w-full px-4 py-2 text-left hover:bg-gray-100 border-b border-gray-200 last:border-b-0"
-                  on:click={() => selectUser(user, false)}
-                >
-                  <div class="flex items-center space-x-3">
-                    {#if user.avatar}
-                      <img src={user.avatar} alt="" class="w-6 h-6 rounded-full" />
-                    {/if}
-                    <span class="font-medium">{user.username}</span>
-                    <span class="text-sm text-gray-500">ID: {user.id}</span>
-                  </div>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
+        <UserSearchInput
+          bind:value={userB}
+          label="Second User (Username or ID)"
+          placeholder="Enter username..."
+          on:change={() => {}}
+        />
       </div>
 
       <!-- Compare Button -->
@@ -509,181 +347,29 @@
 
           <!-- Two Tables Side by Side -->
           <div class="grid grid-cols-1 xl:grid-cols-2 gap-12">
-            <!-- Cards User A Can Give -->
             {#if filteredTrades.length > 0}
               {@const giveTrades = filteredTrades.filter(trade => trade.tradeType === 'give' || trade.tradeType === 'perfect')}
               {#if giveTrades.length > 0}
-              <div class="bg-white rounded-lg shadow-md p-8">
-                <h3 class="text-lg font-bold mb-4 text-orange-600">➡️ {tradeResults.userA.username} Can Give ({giveTrades.length})</h3>
-                
-                <div class="overflow-x-auto">
-                  <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                      <tr>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Set</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rarity</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                      {#each giveTrades as trade}
-                        <tr class="{getRowHighlighting(trade)}" style="{getRowStyle(trade)}">
-                          <!-- Card -->
-                          <td class="px-4 py-3 whitespace-nowrap">
-                            <div class="flex items-center">
-                              <div class="w-8 h-11 rounded border mr-3 flex items-center justify-center overflow-hidden bg-gray-100">
-                                {#if trade.card.small_image_url}
-                                  <img 
-                                    src={trade.card.small_image_url} 
-                                    alt={trade.card.name} 
-                                    class="w-full h-full object-cover rounded"
-                                    loading="lazy"
-                                  />
-                                {:else}
-                                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2z"></path>
-                                  </svg>
-                                {/if}
-                              </div>
-                              <div>
-                                <div class="text-sm font-medium text-gray-900">
-                                  {trade.card.name}
-                                </div>
-                                {#if trade.card.card_number}
-                                  <div class="text-sm text-gray-500">#{trade.card.card_number}</div>
-                                {/if}
-                              </div>
-                            </div>
-                          </td>
-                          
-                          <!-- Set -->
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <div class="max-w-xs">
-                              <p class="truncate text-xs">{trade.card.set_name || trade.card.set_id}</p>
-                            </div>
-                          </td>
-                          
-                          <!-- Rarity -->
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
-                              {trade.card.rarity === 'common' ? 'bg-gray-100 text-gray-800' : 
-                               trade.card.rarity === 'uncommon' ? 'bg-green-100 text-green-800' :
-                               trade.card.rarity === 'rare' ? 'bg-blue-100 text-blue-800' :
-                               trade.card.rarity === 'mythic' ? 'bg-purple-100 text-purple-800' :
-                               'bg-yellow-100 text-yellow-800'}">
-                              {trade.card.rarity || 'Unknown'}
-                            </span>
-                          </td>
-                          
-                          <!-- Count -->
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <div class="text-center">
-                              <span class="font-medium">{trade.userACount || 0}</span>
-                            </div>
-                          </td>
-                          
-                          <!-- Value -->
-                          <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatCurrency(trade.estimatedValue || 0)}
-                          </td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                <TradeTable
+                  title="➡️ {tradeResults.userA.username} Can Give"
+                  trades={giveTrades}
+                  userCountField="userACount"
+                  titleColor="text-orange-600"
+                />
               {/if}
 
-              <!-- Cards User A Can Receive -->
               {@const receiveTrades = filteredTrades.filter(trade => trade.tradeType === 'receive' || trade.tradeType === 'perfect')}
               {#if receiveTrades.length > 0}
-              <div class="bg-white rounded-lg shadow-md p-8">
-                <h3 class="text-lg font-bold mb-4 text-blue-600">⬅️ {tradeResults.userA.username} Can Receive ({receiveTrades.length})</h3>
-                
-                <div class="overflow-x-auto">
-                  <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                      <tr>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Set</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rarity</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                      {#each receiveTrades as trade}
-                        <tr class="hover:bg-gray-50 cursor-pointer">
-                          <!-- Card -->
-                          <td class="px-4 py-3 whitespace-nowrap">
-                            <div class="flex items-center">
-                              <div class="w-8 h-11 rounded border mr-3 flex items-center justify-center overflow-hidden bg-gray-100">
-                                {#if trade.card.small_image_url}
-                                  <img 
-                                    src={trade.card.small_image_url} 
-                                    alt={trade.card.name} 
-                                    class="w-full h-full object-cover rounded"
-                                    loading="lazy"
-                                  />
-                                {:else}
-                                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2z"></path>
-                                  </svg>
-                                {/if}
-                              </div>
-                              <div>
-                                <div class="text-sm font-medium text-gray-900">
-                                  {trade.card.name}
-                                </div>
-                                {#if trade.card.card_number}
-                                  <div class="text-sm text-gray-500">#{trade.card.card_number}</div>
-                                {/if}
-                              </div>
-                            </div>
-                          </td>
-                          
-                          <!-- Set -->
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <div class="max-w-xs">
-                              <p class="truncate text-xs">{trade.card.set_name || trade.card.set_id}</p>
-                            </div>
-                          </td>
-                          
-                          <!-- Rarity -->
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
-                              {trade.card.rarity === 'common' ? 'bg-gray-100 text-gray-800' : 
-                               trade.card.rarity === 'uncommon' ? 'bg-green-100 text-green-800' :
-                               trade.card.rarity === 'rare' ? 'bg-blue-100 text-blue-800' :
-                               trade.card.rarity === 'mythic' ? 'bg-purple-100 text-purple-800' :
-                               'bg-yellow-100 text-yellow-800'}">
-                              {trade.card.rarity || 'Unknown'}
-                            </span>
-                          </td>
-                          
-                          <!-- Count -->
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <div class="text-center">
-                              <span class="font-medium">{trade.userBCount || 0}</span>
-                            </div>
-                          </td>
-                          
-                          <!-- Value -->
-                          <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatCurrency(trade.estimatedValue || 0)}
-                          </td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                <TradeTable
+                  title="⬅️ {tradeResults.userA.username} Can Receive"
+                  trades={receiveTrades}
+                  userCountField="userBCount"
+                  titleColor="text-blue-600"
+                />
               {/if}
 
               <!-- No Trades Message -->
-              {#if filteredTrades.filter(trade => trade.tradeType === 'give' || trade.tradeType === 'perfect').length === 0 && filteredTrades.filter(trade => trade.tradeType === 'receive' || trade.tradeType === 'perfect').length === 0}
+              {#if giveTrades.length === 0 && receiveTrades.length === 0}
                 <div class="col-span-full">
                   <div class="bg-white rounded-lg shadow-md p-8">
                     <div class="text-center py-8">

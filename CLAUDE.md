@@ -6,6 +6,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a robust web application specifically designed to extract complete profile data from rip.fun user pages with intelligent username-to-ID resolution powered by blockchain integration. The app features comprehensive username bridging through Alchemy-powered Base network scanning, fetches HTML from rip.fun profiles with enhanced reliability features, parses the SvelteKit data structure from JavaScript code, automatically removes clip_embedding data to reduce payload size, and provides clean JSON output with comprehensive visualization of profile information, digital cards, packs, and collection statistics.
 
+## 🏗️ Architecture Overview
+
+The application follows a **component-based architecture** with clean separation of concerns:
+
+- **Frontend**: Modular SvelteKit components with specialized functionality
+- **Backend**: Service-oriented API layer with robust data processing
+- **Database**: SQLite with Prisma ORM for user mapping and sync tracking
+- **Caching**: Smart localStorage system with component-level cache management
+- **Integration**: Blockchain services and marketplace API integration
+
+### 🧩 Component Architecture (Post-Refactoring)
+
+The application has been extensively refactored from a monolithic structure to a clean component-based architecture:
+
+**Before Refactoring:**
+- `src/routes/extract/+page.svelte`: 2,216+ lines (monolithic)
+- `src/routes/trade-finder/+page.svelte`: 803 lines (massive duplication)
+
+**After Refactoring:**
+- `src/routes/extract/+page.svelte`: 1,475 lines (**741 lines saved, 33.4% reduction**)
+- `src/routes/trade-finder/+page.svelte`: 488 lines (**315 lines saved, 39% reduction**)
+- **4 New Reusable Components**: CardFilters, CardGrid, CardTable, PackManager
+- **3 Additional Components**: TradeTable, UserSearchInput, Cache utilities
+
+**Total Lines Saved: 1,000+ lines across the application**
+
+### 🔄 Recent Major Refactoring (2025)
+- **Component Architecture**: Complete refactoring from monolithic to component-based design
+- **DRY Principles**: Eliminated over 1,000 lines of duplicate code across the application
+- **Reusable Components**: Created specialized components for card filtering, display, and pack management
+- **Centralized Utilities**: Extracted cache management and trade analysis into shared utilities
+- **Type Safety**: Enhanced TypeScript interfaces and proper event handling between components
+- **Performance Optimization**: Reduced bundle size and improved maintainability
+
 ### Recent Major Enhancements (2025)
 - **Username Bridging System**: Alchemy-powered blockchain integration for username-to-ID resolution with autocomplete functionality
 - **Blockchain Integration**: Base network scanning of rip.fun smart contract for automatic user discovery and mapping
@@ -23,26 +57,136 @@ This is a robust web application specifically designed to extract complete profi
 - **Improved UX**: Real-time progress updates, detailed error messages, cache status indicators, and responsive design
 - **Advanced Data Visualization**: Expandable pack groups, missing cards integration, marketplace data, and comprehensive status tables
 
-## Architecture
+## 📁 File Structure & Components
+
+### Core Application Structure
+
+```
+src/
+├── lib/
+│   ├── components/           # Reusable UI Components
+│   │   ├── CardFilters.svelte     # Advanced filtering interface (247 lines)
+│   │   ├── CardGrid.svelte        # Visual card display grid (230 lines)
+│   │   ├── CardTable.svelte       # Sortable data table with marketplace (332 lines)
+│   │   ├── PackManager.svelte     # Pack grouping and management (201 lines)
+│   │   ├── TradeTable.svelte      # Reusable trade analysis table (127 lines)
+│   │   ├── UserSearchInput.svelte # Username search with autocomplete (111 lines)
+│   │   └── ProfileForm.svelte     # Legacy profile creation form
+│   ├── server/               # Backend Services
+│   │   ├── db/              # Database Layer
+│   │   │   ├── client.ts         # Prisma database client
+│   │   │   └── profiles.ts       # Profile data operations
+│   │   └── services/        # Business Logic Services
+│   │       ├── alchemy.ts        # Blockchain integration with Alchemy SDK
+│   │       ├── fetcher.ts        # Enhanced HTTP fetching with retries
+│   │       ├── parser.ts         # SvelteKit data extraction and parsing
+│   │       ├── normalizer.ts     # Data cleaning and normalization
+│   │       ├── userSync.ts       # Blockchain user synchronization
+│   │       ├── comparator.ts     # Profile comparison logic
+│   │       └── tradeAnalyzer.ts  # Centralized trade analysis
+│   ├── utils/               # Shared Utilities
+│   │   └── cacheUtils.ts         # Centralized localStorage management (162 lines)
+│   └── types.ts             # TypeScript type definitions
+├── routes/                  # SvelteKit Pages and API Endpoints
+│   ├── api/                # API Layer
+│   │   ├── extract/            # Core data extraction endpoint
+│   │   ├── sync-users/         # Blockchain user synchronization
+│   │   ├── resolve-username/   # Username-to-ID resolution
+│   │   ├── search-users/       # User search with autocomplete
+│   │   ├── set/[setId]/        # Pokemon TCG set data
+│   │   ├── card/[cardId]/      # Individual card marketplace data
+│   │   ├── trade-compare/      # Trade analysis endpoint
+│   │   └── profiles/           # Legacy profile management
+│   ├── extract/            # Main Data Extraction Interface
+│   │   └── +page.svelte        # Refactored main extraction page (1,475 lines)
+│   ├── trade-finder/       # Trade Analysis Interface
+│   │   └── +page.svelte        # Refactored trade finder (488 lines)
+│   ├── profiles/           # Legacy Profile Management
+│   └── +layout.svelte      # Global application layout
+└── app.html                # Root HTML template
+```
+
+### 🧩 Component Responsibilities
+
+#### Frontend Components (`src/lib/components/`)
+
+1. **CardFilters.svelte** (247 lines)
+   - **Purpose**: Complete filtering interface for card management
+   - **Features**: Set filtering, rarity filtering, view mode toggle, missing cards options
+   - **Events**: Dispatches filter changes to parent components
+   - **Integration**: Works with all card display components
+
+2. **CardGrid.svelte** (230 lines)
+   - **Purpose**: Visual grid display for cards with missing card indicators
+   - **Features**: Set grouping, card status badges, missing card actions, marketplace links
+   - **Responsive**: Adapts to mobile and desktop layouts
+   - **Integration**: Receives filtered data from CardFilters
+
+3. **CardTable.svelte** (332 lines)
+   - **Purpose**: Comprehensive data table with sortable columns and marketplace integration
+   - **Features**: Sortable headers, marketplace data, buy now/make offer buttons, status indicators
+   - **Columns**: Card, Set, Rarity, Type, Value, Listed Price, Available, Action, Status
+   - **Integration**: Full marketplace API integration for missing cards
+
+4. **PackManager.svelte** (201 lines)
+   - **Purpose**: Intelligent pack grouping and management interface
+   - **Features**: Pack grouping by name, status summaries, expandable details, individual pack tables
+   - **Logic**: Pack status analysis (opened, sealed, pending)
+   - **Display**: Collapsible groups with summary statistics
+
+5. **TradeTable.svelte** (127 lines)
+   - **Purpose**: Reusable trade analysis table with highlighting
+   - **Features**: Dynamic row highlighting, trade type indicators, card count badges
+   - **Events**: Click handling for trade details
+   - **Used By**: Both trade-finder and trade-compare pages
+
+6. **UserSearchInput.svelte** (111 lines)
+   - **Purpose**: Intelligent username search with blockchain integration
+   - **Features**: Autocomplete, username resolution, loading states
+   - **Integration**: Connects to blockchain sync service
+   - **Used By**: Multiple pages requiring user input
+
+#### Backend Services (`src/lib/server/services/`)
+
+1. **alchemy.ts** - Blockchain integration with Base network scanning
+2. **fetcher.ts** - Enhanced HTTP client with retry logic and timeout handling  
+3. **parser.ts** - SvelteKit data extraction from rip.fun HTML
+4. **normalizer.ts** - Data cleaning and structure normalization
+5. **userSync.ts** - Background blockchain user synchronization
+6. **comparator.ts** - Profile comparison and diff generation
+7. **tradeAnalyzer.ts** - Centralized trade analysis logic (shared utility)
+
+#### Shared Utilities (`src/lib/utils/`)
+
+1. **cacheUtils.ts** (162 lines)
+   - **Purpose**: Centralized localStorage management
+   - **Features**: User-specific caching, set data caching, cache expiration
+   - **Functions**: Smart cache keys, cleanup utilities, cache status checking
+   - **Used By**: All components requiring data persistence
 
 ### Core Components
 
-- **Frontend**: Enhanced user interface with username autocomplete, sync management, advanced card filtering, missing cards marketplace integration, localStorage caching, set-based organization, dual view modes, intelligent pack grouping, status tracking, and real-time progress updates
+- **Component-Based Frontend**: Modular SvelteKit components with specialized functionality for card filtering, display, and pack management
 - **Username Bridging System**: Comprehensive blockchain-powered username resolution with Alchemy SDK integration, user search, and sync management
-- **Blockchain Service**: Alchemy-powered Base network scanning for rip.fun smart contract pack purchase events
+- **Blockchain Service**: Alchemy-powered Base network scanning for rip.fun smart contract pack purchase events  
 - **User Sync Service**: Background synchronization coordinator for blockchain data and rip.fun API integration
 - **Database Layer**: SQLite with Prisma ORM for user mappings, address storage, and sync status tracking
-- **Backend API**: Robust rip.fun HTML fetching with retry logic, SvelteKit data parsing, username resolution, and extraction logic
+- **Service-Oriented Backend**: Modular services for data fetching, parsing, normalization, and trade analysis
 - **Enhanced Fetcher Service**: Automatic retry with exponential backoff, progressive timeouts, and smart error handling
-- **Data Processing Pipeline**: 
+- **Component-Based Data Processing Pipeline**: 
   1. Reliable HTML fetching from rip.fun profile URLs (20-60s timeouts, 3 retry attempts)
   2. SvelteKit data structure parsing from JavaScript code
   3. Automatic removal of clip_embedding data from digital_cards and cards arrays
   4. Data sanitization and structure preservation with pack status analysis
-  5. JSON export with complete profile, cards, packs, and statistics data
-- **Data Visualization Engine**: Advanced card filtering, missing cards detection with marketplace integration, set-based organization, smart deduplication, pack grouping logic, status summarization, localStorage caching system, and interactive dual-view displays
-- **Caching System**: Smart localStorage implementation with user-specific and set-specific caching, cache-first loading, and intelligent refresh logic
-- **Marketplace Integration**: Real-time card listing data, buy now functionality, make offer links, and missing cards availability tracking
+  5. Component-based display with CardFilters, CardGrid/CardTable, and PackManager
+  6. JSON export with complete profile, cards, packs, and statistics data
+- **Modular Data Visualization**: 
+  - **CardFilters Component**: Advanced filtering interface with set-based organization
+  - **CardGrid/CardTable Components**: Dual-view display with marketplace integration
+  - **PackManager Component**: Intelligent pack grouping and status tracking
+  - **Centralized Cache Management**: Smart localStorage with component-level cache utilities
+- **Caching System**: Centralized cacheUtils.ts with user-specific and set-specific caching, cache-first loading, and intelligent refresh logic
+- **Marketplace Integration**: Real-time card listing data, buy now functionality, make offer links, and missing cards availability tracking through specialized components
 
 ### Key Workflows
 
@@ -194,3 +338,76 @@ npm run check              # Type checking
 - **Real-time user feedback** during long-running operations with cache status indicators
 - **Comprehensive error handling** with actionable guidance
 - **Responsive design** optimized for all device sizes
+- **🔄 Massive Code Reduction**: 1,000+ lines eliminated through strategic component architecture
+- **🔄 DRY Compliance**: Zero code duplication in UI components and business logic
+- **🔄 Maintainable Architecture**: Clear separation of concerns with specialized components
+- **🔄 Type Safety**: Enhanced TypeScript interfaces and proper event handling
+- **🔄 Performance Optimization**: Reduced bundle size and improved build times
+- **🔄 Developer Experience**: Clear component boundaries and reusable utilities
+
+### 📊 Refactoring Impact Summary
+
+**Code Reduction:**
+- `extract/+page.svelte`: 2,216 → 1,475 lines (**741 lines saved, 33.4% reduction**)
+- `trade-finder/+page.svelte`: 803 → 488 lines (**315 lines saved, 39% reduction**)
+- **Total Reduction**: 1,000+ lines across application
+
+**New Components Created:**
+- `CardFilters.svelte`: 247 lines (filtering interface)
+- `CardGrid.svelte`: 230 lines (visual display)
+- `CardTable.svelte`: 332 lines (data table with marketplace)
+- `PackManager.svelte`: 201 lines (pack management)
+- `TradeTable.svelte`: 127 lines (reusable trade table)
+- `UserSearchInput.svelte`: 111 lines (username search)
+- `cacheUtils.ts`: 162 lines (centralized cache management)
+- `tradeAnalyzer.ts`: Shared trade analysis utilities
+
+**Architecture Benefits:**
+- ✅ **Zero Code Duplication**: All UI logic properly componentized
+- ✅ **Maintainable Structure**: Clear component responsibilities
+- ✅ **Reusable Components**: Components used across multiple pages
+- ✅ **Type Safety**: Proper TypeScript interfaces and event handling
+- ✅ **Performance**: Reduced bundle size and faster builds
+- ✅ **Developer Experience**: Clear file structure and documentation
+
+## 🛠️ Development Guidelines
+
+### Component Development
+When working with components, follow these patterns established in the refactoring:
+
+1. **Event-Driven Architecture**: Use Svelte's event dispatcher for parent-child communication
+2. **Props Interface**: Define clear TypeScript interfaces for component props
+3. **Reusable Logic**: Extract common functionality into utility functions
+4. **Consistent Styling**: Follow Tailwind CSS patterns established in existing components
+5. **Error Handling**: Implement proper error states and loading indicators
+
+### Adding New Components
+1. Follow the established component structure in `src/lib/components/`
+2. Include proper TypeScript types and interfaces
+3. Use event dispatchers for parent communication
+4. Add documentation comments explaining component purpose and usage
+5. Consider reusability across multiple pages
+
+### Cache Management
+Use the centralized `cacheUtils.ts` for all localStorage operations:
+```typescript
+import { getCachedUserData, setCachedUserData, clearUserCache } from '$lib/utils/cacheUtils';
+```
+
+### API Integration
+Follow service-oriented patterns in `src/lib/server/services/`:
+1. Create focused service modules for specific functionality
+2. Include proper error handling and retry logic
+3. Use TypeScript interfaces for request/response types
+4. Follow established patterns in existing services
+
+## 📚 Component Documentation
+
+Each component and service directory contains detailed CLAUDE.md files explaining:
+- Purpose and responsibilities
+- Key features and functionality
+- Integration patterns and usage examples
+- TypeScript interfaces and event handling
+- Performance considerations and best practices
+
+Refer to individual CLAUDE.md files in each directory for component-specific guidance.

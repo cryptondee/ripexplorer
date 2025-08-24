@@ -1,109 +1,19 @@
 <script lang="ts">
-  // localStorage utility functions
-  function getCacheKey(userId: string): string {
-    return `ripexplorer_cache_${userId}`;
-  }
+  import * as cacheUtils from '$lib/utils/cacheUtils.js';
+  import CardFilters from '$lib/components/CardFilters.svelte';
+  import CardGrid from '$lib/components/CardGrid.svelte';
+  import CardTable from '$lib/components/CardTable.svelte';
+  import PackManager from '$lib/components/PackManager.svelte';
 
-  function getSetCacheKey(setId: string): string {
-    return `ripexplorer_set_${setId}`;
-  }
-
-  function saveToCache(userId: string, data: any): void {
-    try {
-      const cacheData = {
-        data,
-        timestamp: Date.now(),
-        userId
-      };
-      localStorage.setItem(getCacheKey(userId), JSON.stringify(cacheData));
-    } catch (err) {
-      console.warn('Failed to save data to localStorage:', err);
-    }
-  }
-
-  function loadFromCache(userId: string): any | null {
-    try {
-      const cached = localStorage.getItem(getCacheKey(userId));
-      if (cached) {
-        const cacheData = JSON.parse(cached);
-        // Check if cache is for the same user
-        if (cacheData.userId === userId) {
-          return cacheData;
-        }
-      }
-      return null;
-    } catch (err) {
-      console.warn('Failed to load data from localStorage:', err);
-      return null;
-    }
-  }
-
-  function saveSetToCache(setId: string, data: any): void {
-    try {
-      const cacheData = {
-        data,
-        timestamp: Date.now(),
-        setId
-      };
-      localStorage.setItem(getSetCacheKey(setId), JSON.stringify(cacheData));
-    } catch (err) {
-      console.warn('Failed to save set data to localStorage:', err);
-    }
-  }
-
-  function loadSetFromCache(setId: string): any | null {
-    try {
-      const cached = localStorage.getItem(getSetCacheKey(setId));
-      if (cached) {
-        const cacheData = JSON.parse(cached);
-        return cacheData;
-      }
-      return null;
-    } catch (err) {
-      console.warn('Failed to load set data from localStorage:', err);
-      return null;
-    }
-  }
-
-  function clearUserCache(userId: string): void {
-    try {
-      localStorage.removeItem(getCacheKey(userId));
-    } catch (err) {
-      console.warn('Failed to clear user cache:', err);
-    }
-  }
-
+  // Wrapper functions for cache operations with in-memory state management
   function clearAllSetCaches(): void {
-    try {
-      // Get all localStorage keys
-      const keys = Object.keys(localStorage);
-      // Remove all set cache keys
-      keys.forEach(key => {
-        if (key.startsWith('ripexplorer_set_')) {
-          localStorage.removeItem(key);
-        }
-      });
-      setCardsData = {}; // Clear in-memory set cache too
-      console.log('Cleared all set caches');
-    } catch (err) {
-      console.warn('Failed to clear set caches:', err);
-    }
+    cacheUtils.clearAllSetCaches();
+    setCardsData = {}; // Clear in-memory set cache too
   }
 
   function clearAllCaches(): void {
-    try {
-      // Clear all user and set caches
-      const keys = Object.keys(localStorage);
-      keys.forEach(key => {
-        if (key.startsWith('ripexplorer_')) {
-          localStorage.removeItem(key);
-        }
-      });
-      setCardsData = {};
-      console.log('Cleared all caches (user + set data)');
-    } catch (err) {
-      console.warn('Failed to clear all caches:', err);
-    }
+    cacheUtils.clearAllCaches();
+    setCardsData = {}; // Clear in-memory set cache too
   }
 
   // Helper function to get human-readable set name
@@ -251,6 +161,14 @@
     pageSize = newSize;
     currentPage = 1; // Reset to first page when page size changes
   }
+
+  function handleSetChange() {
+    currentPage = 1; // Reset to first page when set changes
+  }
+
+  function handleRarityChange() {
+    currentPage = 1; // Reset to first page when rarity changes
+  }
   
   // Paginate cards
   function paginateCards(cards: any[]) {
@@ -306,7 +224,7 @@
 
     // Check localStorage cache unless force refresh is requested
     if (!forceRefresh) {
-      const cached = loadSetFromCache(setId);
+      const cached = cacheUtils.loadSetFromCache(setId);
       if (cached) {
         console.log('Loading set data from cache:', setId);
         setCardsData[setId] = cached.data;
@@ -335,7 +253,7 @@
       setCardsData[setId] = data;
       
       // Save to localStorage cache
-      saveSetToCache(setId, data);
+      cacheUtils.saveSetToCache(setId, data);
       console.log('Saved set data to cache:', setId);
       
       return data;
@@ -569,7 +487,7 @@
 
     // Check cache first unless force refresh is requested
     if (!forceRefresh) {
-      const cached = loadFromCache(ripUserId.trim());
+      const cached = cacheUtils.loadFromCache(ripUserId.trim());
       if (cached) {
         console.log('Loading data from cache for user:', ripUserId.trim());
         extractedData = cached.data;
@@ -632,7 +550,7 @@
       };
       
       // Save to cache
-      saveToCache(ripUserId.trim(), extractedData);
+      cacheUtils.saveToCache(ripUserId.trim(), extractedData);
       console.log('Saved user data to cache for:', ripUserId.trim());
       
       loadingMessage = 'Extraction completed successfully!';
@@ -947,7 +865,7 @@
               <button
                 onclick={() => { 
                   forceRefresh = true; 
-                  clearUserCache(ripUserId.trim());
+                  cacheUtils.clearUserCache(ripUserId.trim());
                   // Note: We don't clear set caches since set data is static and doesn't change
                   runExtraction(); 
                 }}
@@ -1220,14 +1138,13 @@
               </div>
 
               <!-- Digital Cards Section -->
-              {#snippet cardsSection()}
-                {@const baseCards = combinedCards}
-                {@const filteredCards = filterCards(baseCards)}
-                {@const sortedCards = sortCards(filteredCards)}
-                {@const totalCards = sortedCards.length}
-                {@const totalPages = Math.ceil(totalCards / pageSize)}
-                {@const paginatedCards = paginateCards(sortedCards)}
-                {@const allRarities = [...new Set(extractedData.profile.digital_cards.map((card: any) => card.card?.rarity).filter(Boolean))].sort()}
+              {@const baseCards = combinedCards}
+              {@const filteredCards = filterCards(baseCards)}
+              {@const sortedCards = sortCards(filteredCards)}
+              {@const totalCards = sortedCards.length}
+              {@const totalPages = Math.ceil(totalCards / pageSize)}
+              {@const paginatedCards = paginateCards(sortedCards)}
+              {@const allRarities = [...new Set(extractedData.profile.digital_cards.map((card: any) => card.card?.rarity).filter(Boolean))].sort()}
                 
               <div class="bg-white shadow rounded-lg p-6">
                 
@@ -1256,864 +1173,109 @@
                     </div>
                   </div>
                   
-                  <!-- Filters and View Controls -->
-                  <div class="space-y-4 p-4 bg-gray-50 rounded-lg">
-                    <!-- Search Bar -->
-                    <div>
-                      <label for="searchCards" class="block text-sm font-medium text-gray-700 mb-1">
-                        Search Cards
-                      </label>
-                      <input
-                        type="text"
-                        id="searchCards"
-                        bind:value={searchQuery}
-                        placeholder="Search by name, card number, or set..."
-                        class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                      />
-                    </div>
-                    
-                    <div class="flex flex-col sm:flex-row gap-4">
-                      <!-- Set Filter -->
-                      <div class="flex-1">
-                        <label for="setFilter" class="block text-sm font-medium text-gray-700 mb-1">
-                          Filter by Set
-                        </label>
-                        <select 
-                          id="setFilter"
-                          bind:value={selectedSet}
-                          class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                          <option value="all">All Sets ({extractedData.profile.digital_cards.length} cards)</option>
-                          {#each Object.entries(cardsBySet) as [setName, setData]}
-                            {@const set = setData as any}
-                            <option value={setName}>
-                              {setName} ({set.cards.length} cards)
-                            </option>
-                          {/each}
-                        </select>
-                      </div>
-                      
-                      <!-- Rarity Filter -->
-                      <div class="flex-1">
-                        <label for="rarityFilter" class="block text-sm font-medium text-gray-700 mb-1">
-                          Filter by Rarity
-                        </label>
-                        <select 
-                          id="rarityFilter"
-                          bind:value={selectedRarity}
-                          class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                          <option value="all">All Rarities</option>
-                          {#each allRarities as rarity}
-                            <option value={rarity}>{rarity}</option>
-                          {/each}
-                        </select>
-                      </div>
-                      
-                      <!-- View Mode Toggle -->
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                          View Mode
-                        </label>
-                        <div class="flex rounded-lg border border-gray-300 overflow-hidden">
-                          <button
-                            onclick={() => viewMode = 'grid'}
-                            class="px-3 py-2 text-sm font-medium {viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                          >
-                            Grid
-                          </button>
-                          <button
-                            onclick={() => viewMode = 'table'}
-                            class="px-3 py-2 text-sm font-medium border-l border-gray-300 {viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                          >
-                            Table
-                          </button>
-                        </div>
-                      </div>
-                      
-                      
-                      <!-- Missing Cards Toggle -->
-                      {#if selectedSet !== 'all'}
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Missing Cards
-                          </label>
-                          <label class="flex items-center">
-                            <input
-                              type="checkbox"
-                              bind:checked={showMissingCards}
-                              onchange={() => { if (showMissingCards) onlyMissingCards = false; }}
-                              class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
-                              disabled={fetchingAllSets || loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
-                            />
-                            <span class="ml-2 text-sm text-gray-700">Show missing cards</span>
-                            {#if fetchingAllSets}
-                              <svg class="ml-2 w-4 h-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                            {:else if loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
-                              <svg class="ml-2 w-4 h-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                            {/if}
-                          </label>
-                          {#if setDataErrors[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
-                            <div class="mt-1 text-xs text-red-600">
-                              Error loading set data: {setDataErrors[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
-                            </div>
-                          {/if}
-                          {#if bulkFetchErrors.length > 0}
-                            <div class="mt-1 text-xs text-yellow-600">
-                              Some set data failed to load ({bulkFetchErrors.length} errors)
-                            </div>
-                          {/if}
-                        </div>
-                        
-                        <!-- Only Missing Cards Toggle -->
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Filter Options
-                          </label>
-                          <label class="flex items-center">
-                            <input
-                              type="checkbox"
-                              bind:checked={onlyMissingCards}
-                              onchange={() => { if (onlyMissingCards) showMissingCards = false; }}
-                              class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
-                              disabled={fetchingAllSets || loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
-                            />
-                            <span class="ml-2 text-sm text-gray-700">Only show missing cards</span>
-                            {#if fetchingAllSets}
-                              <svg class="ml-2 w-4 h-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                            {:else if loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
-                              <svg class="ml-2 w-4 h-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                            {/if}
-                          </label>
-                          
-                          <!-- Available Only Toggle -->
-                          <label class="flex items-center mt-2">
-                            <input
-                              type="checkbox"
-                              bind:checked={availableOnly}
-                              class="rounded border-gray-300 text-indigo-600 focus:border-indigo-500 focus:ring-indigo-500"
-                              disabled={fetchingAllSets || loadingSetData[cardsBySet[selectedSet]?.cards[0]?.card?.set_id]}
-                            />
-                            <span class="ml-2 text-sm text-gray-700">Available only (for missing cards)</span>
-                          </label>
-                        </div>
-                      {/if}
-                      
-                      <!-- Page Size Selector -->
-                      <div>
-                        <label for="pageSizeSelect" class="block text-sm font-medium text-gray-700 mb-1">
-                          Page Size
-                        </label>
-                        <select 
-                          id="pageSizeSelect"
-                          bind:value={pageSize}
-                          onchange={(e) => handlePageSizeChange(parseInt((e.target as HTMLSelectElement).value))}
-                          class="rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                          {#each pageSizeOptions as size}
-                            <option value={size}>{size} cards</option>
-                          {/each}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  <!-- Filters Component -->
+                  <CardFilters
+                    bind:selectedSet
+                    bind:selectedRarity
+                    bind:viewMode
+                    bind:showMissingCards
+                    bind:onlyMissingCards
+                    bind:availableOnly
+                    bind:searchTerm={searchQuery}
+                    bind:pageSize
+                    maxPageSize={filteredCards.length}
+                    {cardsBySet}
+                    {allRarities}
+                    {fetchingAllSets}
+                    {loadingSetData}
+                    {setDataErrors}
+                    {bulkFetchErrors}
+                    on:searchChange={(e) => searchQuery = e.detail}
+                    on:setChange={() => handleSetChange()}
+                    on:rarityChange={() => handleRarityChange()}
+                    on:viewModeChange={(e) => viewMode = e.detail}
+                    on:missingCardsToggle={(e) => showMissingCards = e.detail}
+                    on:onlyMissingToggle={(e) => onlyMissingCards = e.detail}
+                    on:availableOnlyToggle={(e) => availableOnly = e.detail}
+                    on:pageSizeChange={(e) => handlePageSizeChange(e.detail)}
+                  />
 
                 <!-- Cards Display -->
                 {#if viewMode === 'grid'}
-                  <!-- Grid View -->
-                  {#if selectedSet === 'all'}
-                    <!-- All Sets - Grouped Display -->
-                    {#each Object.entries(cardsBySet) as [setName, setData]}
-                      {@const set = setData as any}
-                      {@const setCards = Object.values(set.cards.reduce((unique: any, card: any) => {
-                        const cardId = card.card?.id;
-                        if (!unique[cardId] || unique[cardId].listing) {
-                          unique[cardId] = card;
-                        }
-                        return unique;
-                      }, {}))}
-                      
-                      <div class="mb-6 border rounded-lg p-4">
-                        <div class="flex justify-between items-center mb-3">
-                          <h3 class="font-medium text-gray-900">
-                            {setName}
-                            <span class="text-sm text-gray-500">({setCards.length} cards)</span>
-                          </h3>
-                          {#if set.releaseDate}
-                            <div class="text-sm text-gray-500">
-                              Release: {new Date(set.releaseDate).toLocaleDateString()}
-                            </div>
-                          {/if}
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {#each setCards as card}
-                            <div class="border border-gray-200 rounded-lg p-3 bg-gray-50 relative">
-                              <div class="flex items-start justify-between mb-2">
-                                <div class="flex-1">
-                                  <h4 class="font-medium text-sm text-gray-900">
-                                    {card.card?.name || 'Unknown Card'}
-                                    {#if card.card?.card_number}
-                                      <span class="text-gray-500">#{card.card.card_number}</span>
-                                    {/if}
-                                  </h4>
-                                  <p class="text-xs text-gray-600 mt-1">
-                                    {card.card?.rarity || 'Unknown Rarity'}
-                                    {#if card.card?.types}
-                                      • {card.card.types.join(', ')}
-                                    {/if}
-                                  </p>
-                                </div>
-                                <div class="w-10 h-14 bg-gradient-to-br from-blue-100 to-indigo-100 rounded border ml-2 flex items-center justify-center">
-                                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                  </svg>
-                                </div>
-                              </div>
-                              
-                              <div class="space-y-1 text-xs">
-                                {#if card.card?.hp}
-                                  <div class="flex justify-between">
-                                    <span class="text-gray-500">HP:</span>
-                                    <span class="text-gray-900">{card.card.hp}</span>
-                                  </div>
-                                {/if}
-                                {#if card.listing}
-                                  <div class="flex justify-between">
-                                    <span class="text-gray-500">Listed:</span>
-                                    <span class="text-green-600 font-medium">${card.listing.usd_price}</span>
-                                  </div>
-                                {:else if card.card?.raw_price}
-                                  <div class="flex justify-between">
-                                    <span class="text-gray-500">Value:</span>
-                                    <span class="text-gray-900">${card.card.raw_price}</span>
-                                  </div>
-                                {/if}
-                                <div class="flex justify-between">
-                                  <span class="text-gray-500">Status:</span>
-                                  <span class="text-gray-900">
-                                    {#if card.is_listed}
-                                      <span class="text-green-600">Listed</span>
-                                    {:else}
-                                      <span class="text-gray-600">Owned</span>
-                                    {/if}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          {/each}
-                        </div>
-                      </div>
-                    {/each}
-                  {:else}
-                    <!-- Single Set - Grid Display -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {#each paginatedCards as card}
-                        <div class="border {card.isMissing ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'} rounded-lg p-3 relative">
-                          <div class="flex items-start justify-between mb-2">
-                            <div class="flex-1">
-                              <h4 class="font-medium text-sm text-gray-900">
-                                {card.card?.name || 'Unknown Card'}
-                                {#if card.card?.card_number}
-                                  <span class="text-gray-500">#{card.card.card_number}</span>
-                                {/if}
-                              </h4>
-                              <p class="text-xs text-gray-600 mt-1">
-                                {card.card?.rarity || 'Unknown Rarity'}
-                                {#if card.card?.types}
-                                  • {card.card.types.join(', ')}
-                                {/if}
-                              </p>
-                            </div>
-                            <div class="w-10 h-14 bg-gradient-to-br from-blue-100 to-indigo-100 rounded border ml-2 flex items-center justify-center">
-                              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                              </svg>
-                            </div>
-                          </div>
-                          
-                          <div class="space-y-1 text-xs">
-                            {#if card.card?.hp}
-                              <div class="flex justify-between">
-                                <span class="text-gray-500">HP:</span>
-                                <span class="text-gray-900">{card.card.hp}</span>
-                              </div>
-                            {/if}
-                            {#if card.listing}
-                              <div class="flex justify-between">
-                                <span class="text-gray-500">Listed:</span>
-                                <span class="text-green-600 font-medium">${card.listing.usd_price}</span>
-                              </div>
-                            {:else if card.card?.raw_price}
-                              <div class="flex justify-between">
-                                <span class="text-gray-500">Value:</span>
-                                <span class="text-gray-900">${card.card.raw_price}</span>
-                              </div>
-                            {/if}
-                            <div class="flex justify-between">
-                              <span class="text-gray-500">Status:</span>
-                              <span class="text-gray-900">
-                                {#if card.isMissing}
-                                  <span class="text-red-600">Missing</span>
-                                {:else if card.is_listed}
-                                  <span class="text-green-600">Listed</span>
-                                {:else}
-                                  <span class="text-gray-600">Owned</span>
-                                {/if}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      {/each}
-                    </div>
-                  {/if}
+                  <CardGrid
+                    {selectedSet}
+                    {cardsBySet}
+                    paginatedCards={paginatedCards}
+                    on:cardClick={(e) => openCardModal(e.detail.card, e.detail.cards)}
+                  />
                 {:else}
-                  <!-- Table View -->
-                  <div class="mb-2">
-                    <p class="text-sm text-gray-600">
-                      💡 Click on any row to view detailed card information and high-resolution images
-                    </p>
-                  </div>
-                  <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                      <thead class="bg-gray-50">
-                        <tr>
-                          <th 
-                            scope="col" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-                            onclick={() => handleSort('name')}
-                          >
-                            <div class="flex items-center space-x-1">
-                              <span>Card</span>
-                              {#if sortColumn === 'name'}
-                                <span class="text-indigo-600">
-                                  {sortDirection === 'asc' ? '↑' : '↓'}
-                                </span>
-                              {/if}
-                            </div>
-                          </th>
-                          <th 
-                            scope="col" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-                            onclick={() => handleSort('set')}
-                          >
-                            <div class="flex items-center space-x-1">
-                              <span>Set</span>
-                              {#if sortColumn === 'set'}
-                                <span class="text-indigo-600">
-                                  {sortDirection === 'asc' ? '↑' : '↓'}
-                                </span>
-                              {/if}
-                            </div>
-                          </th>
-                          <th 
-                            scope="col" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-                            onclick={() => handleSort('rarity')}
-                          >
-                            <div class="flex items-center space-x-1">
-                              <span>Rarity</span>
-                              {#if sortColumn === 'rarity'}
-                                <span class="text-indigo-600">
-                                  {sortDirection === 'asc' ? '↑' : '↓'}
-                                </span>
-                              {/if}
-                            </div>
-                          </th>
-                          <th 
-                            scope="col" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-                            onclick={() => handleSort('type')}
-                          >
-                            <div class="flex items-center space-x-1">
-                              <span>Type</span>
-                              {#if sortColumn === 'type'}
-                                <span class="text-indigo-600">
-                                  {sortDirection === 'asc' ? '↑' : '↓'}
-                                </span>
-                              {/if}
-                            </div>
-                          </th>
-                          <th 
-                            scope="col" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-                            onclick={() => handleSort('value')}
-                          >
-                            <div class="flex items-center space-x-1">
-                              <span>Value</span>
-                              {#if sortColumn === 'value'}
-                                <span class="text-indigo-600">
-                                  {sortDirection === 'asc' ? '↑' : '↓'}
-                                </span>
-                              {/if}
-                            </div>
-                          </th>
-                          <th 
-                            scope="col" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-                            onclick={() => handleSort('listedPrice')}
-                          >
-                            <div class="flex items-center space-x-1">
-                              <span>Listed Price</span>
-                              {#if sortColumn === 'listedPrice'}
-                                <span class="text-indigo-600">
-                                  {sortDirection === 'asc' ? '↑' : '↓'}
-                                </span>
-                              {/if}
-                            </div>
-                          </th>
-                          <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Available
-                          </th>
-                          <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Action
-                          </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody class="bg-white divide-y divide-gray-200">
-                        {#each paginatedCards as card}
-                          <tr 
-                            class="{card.isMissing ? 'bg-red-50 hover:bg-red-100 cursor-pointer border-l-4 border-red-400' : 'hover:bg-gray-50 cursor-pointer'}"
-                            onclick={() => openCardModal(card, [card])}
-                          >
-                            <td class="px-6 py-4 whitespace-nowrap">
-                              <div class="flex items-center">
-                                <div class="w-8 h-11 rounded border mr-3 flex items-center justify-center overflow-hidden bg-gray-100">
-                                  {#if card.card?.small_image_url}
-                                    <img 
-                                      src={card.card.small_image_url} 
-                                      alt={card.card?.name || 'Card'} 
-                                      class="w-full h-full object-cover rounded"
-                                      loading="lazy"
-                                    />
-                                  {:else}
-                                    <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                  {/if}
-                                </div>
-                                <div>
-                                  <div class="text-sm font-medium text-gray-900">
-                                    {card.card?.name || 'Unknown Card'}
-                                  </div>
-                                  {#if card.card?.card_number}
-                                    <div class="text-sm text-gray-500">#{card.card.card_number}</div>
-                                  {/if}
-                                </div>
-                              </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {getSetName(card)}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                {card.card?.rarity || 'Unknown'}
-                              </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {card.card?.types?.join(', ') || 'Unknown'}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {#if card.isMissing && card.marketValue}
-                                ${card.marketValue}
-                              {:else if card.listing}
-                                <span class="text-green-600 font-medium">${card.listing.usd_price}</span>
-                              {:else if card.card?.raw_price}
-                                ${card.card.raw_price}
-                              {:else}
-                                —
-                              {/if}
-                            </td>
-                            <!-- Listed Price Column -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {#if card.isMissing && card.lowestPrice}
-                                ${card.lowestPrice.toFixed(2)}
-                              {:else if card.listing}
-                                <span class="text-green-600 font-medium">${card.listing.usd_price}</span>
-                              {:else if card.card?.raw_price}
-                                ${card.card.raw_price}
-                              {:else}
-                                —
-                              {/if}
-                            </td>
-                            <!-- Available Column -->
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
-                              {#if card.isMissing}
-                                {#if card.is_listed}
-                                  <svg class="w-5 h-5 text-green-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                  </svg>
-                                {:else}
-                                  <svg class="w-5 h-5 text-red-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                  </svg>
-                                {/if}
-                              {:else}
-                                <span class="text-gray-400 text-sm">N/A</span>
-                              {/if}
-                            </td>
-                            <!-- Action Column -->
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
-                              {#if card.isMissing}
-                                <a 
-                                  href={card.buyNowUrl} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-white {card.is_listed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-500 hover:bg-gray-600'}"
-                                >
-                                  {card.is_listed ? 'Buy Now' : 'Make Offer'}
-                                </a>
-                              {:else}
-                                <span class="text-gray-400 text-sm">N/A</span>
-                              {/if}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {card.isMissing ? 'bg-red-100 text-red-800' : (card.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')}">
-                                {card.isMissing ? 'Missing' : (card.is_listed ? 'Listed' : 'Owned')}
-                              </span>
-                            </td>
-                          </tr>
-                        {/each}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  <!-- Pagination Controls -->
-                  <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50 px-4 py-3 rounded-lg">
-                    <!-- Pagination Info -->
+                  <CardTable
+                    paginatedCards={paginatedCards}
+                    {sortColumn}
+                    {sortDirection}
+                    on:cardClick={(e) => openCardModal(e.detail.card, e.detail.cards)}
+                    on:sort={(e) => handleSort(e.detail.column)}
+                  />
+                {/if}
+
+                <!-- Pagination -->
+                {#if totalPages > 1}
+                  <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div class="text-sm text-gray-700">
-                      Showing page {currentPage} of {totalPages} 
-                      ({((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalCards)} of {totalCards} cards)
+                      Showing page {currentPage} of {totalPages}
                     </div>
                     
-                    <!-- Pagination Buttons -->
-                    <div class="flex items-center space-x-2">
-                      <!-- First Page -->
+                    <div class="flex items-center gap-2">
                       <button
-                        onclick={goToFirstPage}
+                        onclick={() => goToFirstPage()}
                         disabled={currentPage === 1}
-                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="px-3 py-1 text-sm border rounded-md {currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                       >
-                        ««
+                        First
                       </button>
                       
-                      <!-- Previous Page -->
                       <button
-                        onclick={previousPage}
+                        onclick={() => previousPage()}
                         disabled={currentPage === 1}
-                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="px-3 py-1 text-sm border rounded-md {currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                       >
-                        ‹ Prev
+                        Previous
                       </button>
                       
-                      <!-- Page Numbers -->
-                      {#each Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        const start = Math.max(1, currentPage - 2);
-                        const end = Math.min(totalPages, start + 4);
-                        return start + i;
-                      }).filter(page => page <= totalPages) as page}
-                        <button
-                          onclick={() => goToPage(page)}
-                          class="px-3 py-2 text-sm font-medium {currentPage === page 
-                            ? 'text-indigo-600 bg-indigo-50 border-indigo-500' 
-                            : 'text-gray-500 bg-white border-gray-300 hover:bg-gray-50'} border rounded-md"
-                        >
-                          {page}
-                        </button>
-                      {/each}
+                      <span class="px-3 py-1 text-sm text-gray-700">
+                        {currentPage}
+                      </span>
                       
-                      <!-- Next Page -->
                       <button
                         onclick={() => nextPage(totalPages)}
                         disabled={currentPage === totalPages}
-                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="px-3 py-1 text-sm border rounded-md {currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                       >
-                        Next ›
+                        Next
                       </button>
                       
-                      <!-- Last Page -->
                       <button
                         onclick={() => goToLastPage(totalPages)}
                         disabled={currentPage === totalPages}
-                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="px-3 py-1 text-sm border rounded-md {currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
                       >
-                        »»
+                        Last
                       </button>
                     </div>
                   </div>
                 {/if}
               </div>
-              {/snippet}
-              
-              {@render cardsSection()}
-            {/if}
 
-            <!-- Digital Products Section -->
-            {#if extractedData.profile.digital_products && extractedData.profile.digital_products.length > 0}
-              {@const groupedPacks = extractedData.profile.digital_products.reduce((groups: any, product: any) => {
-                const packName = product.name || 'Unknown Pack';
-                if (!groups[packName]) {
-                  groups[packName] = {
-                    name: packName,
-                    items: [],
-                    totalValue: 0,
-                    listedCount: 0,
-                    ownedCount: 0,
-                    openedCount: 0,
-                    sealedCount: 0,
-                    pendingOpenCount: 0,
-                    sampleImage: null
-                  };
-                }
-                
-                groups[packName].items.push(product);
-                groups[packName].totalValue += parseFloat(product.product?.current_value || '0');
-                
-                if (product.is_listed) {
-                  groups[packName].listedCount++;
-                } else {
-                  groups[packName].ownedCount++;
-                }
-                
-                // Count pack statuses based on open_status
-                const status = product.open_status?.toLowerCase() || 'unknown';
-                if (status.includes('opened') || status === 'opened') {
-                  groups[packName].openedCount++;
-                } else if (status.includes('sealed') || status === 'sealed' || status === 'unopened') {
-                  groups[packName].sealedCount++;
-                } else if (status.includes('pending') || status.includes('opening')) {
-                  groups[packName].pendingOpenCount++;
-                } else if (!product.is_listed) {
-                  // If no specific status but owned, assume sealed
-                  groups[packName].sealedCount++;
-                }
-                
-                if (!groups[packName].sampleImage && product.front_image_url) {
-                  groups[packName].sampleImage = product.front_image_url;
-                }
-                
-                return groups;
-              }, {})}
-              
-              <div class="bg-white shadow rounded-lg p-6">
-                <div class="flex justify-between items-center mb-6">
-                  <h2 class="text-lg font-medium text-gray-900">Digital Products ({extractedData.profile.digital_products.length})</h2>
-                  <div class="text-sm text-gray-500">
-                    {Object.keys(groupedPacks).length} unique pack types
-                  </div>
-                </div>
-
-                <!-- Grouped Pack Display -->
-                <div class="space-y-6">
-                  {#each Object.values(groupedPacks) as packGroup, index}
-                    {@const group = packGroup as any}
-                    {@const groupId = `group-${index}`}
-                    
-                    <div class="border border-gray-200 rounded-lg overflow-hidden">
-                      <!-- Pack Group Header -->
-                      <button
-                        class="w-full px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 border-b border-gray-200 flex items-center justify-between transition-colors"
-                        onclick={() => {
-                          const details = document.getElementById(`details-${groupId}`);
-                          const icon = document.getElementById(`icon-${groupId}`);
-                          if (details && icon) {
-                            details.classList.toggle('hidden');
-                            icon.classList.toggle('rotate-180');
-                          }
-                        }}
-                      >
-                        <div class="flex items-center space-x-4">
-                          {#if group.sampleImage}
-                            <img 
-                              src={group.sampleImage} 
-                              alt={group.name} 
-                              class="w-12 h-16 object-cover rounded border"
-                              loading="lazy"
-                            />
-                          {/if}
-                          <div class="text-left">
-                            <h3 class="text-lg font-semibold text-gray-900">{group.name}</h3>
-                            <p class="text-sm text-gray-600">
-                              {group.items.length} packs • 
-                              <span class="text-green-600 font-medium">{group.openedCount} opened</span> • 
-                              <span class="text-blue-600 font-medium">{group.sealedCount} sealed</span>
-                              {#if group.pendingOpenCount > 0}
-                                • <span class="text-orange-600 font-medium">{group.pendingOpenCount} pending</span>
-                              {/if}
-                              {#if group.totalValue > 0}
-                                • ${group.totalValue.toFixed(2)} value
-                              {/if}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div class="flex items-center space-x-2">
-                          <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                            {group.items.length}
-                          </span>
-                          <svg 
-                            id="icon-{groupId}"
-                            class="h-5 w-5 text-gray-500 transition-transform transform rotate-0"
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            stroke="currentColor"
-                          >
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </button>
-
-                      <!-- Expandable Pack Details -->
-                      <div id="details-{groupId}" class="hidden bg-white">
-                        <!-- Summary Section -->
-                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-200">
-                          <h4 class="text-sm font-semibold text-gray-900 mb-3">{group.name} Summary</h4>
-                          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div class="text-center">
-                              <div class="text-2xl font-bold text-green-600">{group.openedCount}</div>
-                              <div class="text-xs text-gray-600 uppercase tracking-wide">Opened</div>
-                            </div>
-                            <div class="text-center">
-                              <div class="text-2xl font-bold text-blue-600">{group.sealedCount}</div>
-                              <div class="text-xs text-gray-600 uppercase tracking-wide">Sealed</div>
-                            </div>
-                            <div class="text-center">
-                              <div class="text-2xl font-bold text-orange-600">{group.pendingOpenCount}</div>
-                              <div class="text-xs text-gray-600 uppercase tracking-wide">Pending Open</div>
-                            </div>
-                            <div class="text-center">
-                              <div class="text-2xl font-bold text-gray-800">{group.items.length}</div>
-                              <div class="text-xs text-gray-600 uppercase tracking-wide">Total Packs</div>
-                            </div>
-                          </div>
-                          {#if group.totalValue > 0}
-                            <div class="mt-3 text-center">
-                              <div class="text-lg font-semibold text-gray-900">
-                                Total Value: ${group.totalValue.toFixed(2)}
-                              </div>
-                            </div>
-                          {/if}
-                        </div>
-                        
-                        <div class="overflow-x-auto">
-                          <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                              <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  ID
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Status
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                              {#each group.items as product}
-                                <tr class="hover:bg-gray-50">
-                                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    #{product.id}
-                                  </td>
-                                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {product.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                                      {product.is_listed ? 'Listed' : (product.open_status || 'Owned')}
-                                    </span>
-                                  </td>
-                                </tr>
-                              {/each}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  {/each}
-                </div>
-
-                <!-- Individual Cards Section (if any exist separately) -->
-                {#if extractedData.profile.digital_products.filter((product: any) => 
-                  product.product?.type !== 'pack' && product.product?.type !== 'Pack' && 
-                  !product.name?.toLowerCase().includes('pack') && 
-                  !product.name?.toLowerCase().includes('booster')
-                ).length > 0}
-                  {@const nonPackProducts = extractedData.profile.digital_products.filter((product: any) => 
-                    product.product?.type !== 'pack' && product.product?.type !== 'Pack' && 
-                    !product.name?.toLowerCase().includes('pack') && 
-                    !product.name?.toLowerCase().includes('booster')
-                  )}
-                  <div class="mt-8 pt-6 border-t border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Individual Cards & Products ({nonPackProducts.length})</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {#each nonPackProducts as product}
-                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                          <div class="flex items-start justify-between mb-2">
-                            <div class="flex-1">
-                              <h4 class="font-medium text-sm text-gray-900">{product.name || 'Unknown Product'}</h4>
-                              <p class="text-xs text-gray-600 mt-1">
-                                {#if product.set?.name}
-                                  {product.set.name}
-                                {/if}
-                              </p>
-                            </div>
-                            {#if product.front_image_url}
-                              <img 
-                                src={product.front_image_url} 
-                                alt={product.name} 
-                                class="w-12 h-16 object-cover rounded border ml-2"
-                                loading="lazy"
-                              />
-                            {/if}
-                          </div>
-                          
-                          <div class="space-y-1 text-xs">
-                            <div class="flex justify-between">
-                              <span class="text-gray-500">Type:</span>
-                              <span class="text-gray-900">{product.product?.type || 'Unknown'}</span>
-                            </div>
-                            {#if product.product?.current_value}
-                              <div class="flex justify-between">
-                                <span class="text-gray-500">Value:</span>
-                                <span class="text-gray-900">${product.product.current_value}</span>
-                              </div>
-                            {/if}
-                            <div class="flex justify-between">
-                              <span class="text-gray-500">Status:</span>
-                              <span class="text-gray-900">
-                                {#if product.is_listed}
-                                  <span class="text-green-600">Listed</span>
-                                {:else}
-                                  <span class="text-gray-600">{product.open_status || 'Owned'}</span>
-                                {/if}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      {/each}
-                    </div>
-                  </div>
-                {/if}
-              </div>
+              <!-- Digital Products Section -->
+              {#if extractedData.profile.digital_products && extractedData.profile.digital_products.length > 0}
+                <PackManager digitalProducts={extractedData.profile.digital_products} />
+              {/if}
+            </div>
             {/if}
           </div>
         {/if}
       </div>
     {/if}
-  </div>
-</div>
 
 <!-- Card Detail Modal -->
 {#if showCardModal && selectedCard}
@@ -2309,3 +1471,6 @@
     </div>
   </div>
 {/if}
+
+  </div>
+</div>

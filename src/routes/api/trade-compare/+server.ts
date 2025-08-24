@@ -37,48 +37,67 @@ async function extractUserProfile(input: string, request: Request) {
   };
 }
 
+// Shared function to perform complete trade analysis for two users
+async function getTradeAnalysisForUsers(userA_input: string, userB_input: string, request: Request) {
+  if (!userA_input || !userB_input) {
+    throw new Error('Both userA and userB are required');
+  }
+  
+  if (userA_input === userB_input) {
+    throw new Error('Cannot compare user with themselves');
+  }
+  
+  console.log(`Starting trade analysis between "${userA_input}" and "${userB_input}"`);
+  
+  // Extract both user profiles in parallel
+  const [profileA, profileB] = await Promise.all([
+    extractUserProfile(userA_input, request),
+    extractUserProfile(userB_input, request)
+  ]);
+  
+  console.log(`Profile extraction complete:`);
+  console.log(`- ${profileA.username} (ID: ${profileA.id}): ${profileA.cards.length} cards`);
+  console.log(`- ${profileB.username} (ID: ${profileB.id}): ${profileB.cards.length} cards`);
+  
+  // Create user collections for trade analysis
+  const collectionA = tradeAnalyzer.createUserCollection(
+    profileA.username, 
+    profileA.id, 
+    profileA.profile, 
+    profileA.cards
+  );
+  
+  const collectionB = tradeAnalyzer.createUserCollection(
+    profileB.username,
+    profileB.id, 
+    profileB.profile,
+    profileB.cards
+  );
+  
+  // Analyze trade opportunities
+  console.log('Analyzing trade opportunities...');
+  const tradeAnalysis = tradeAnalyzer.analyzeTrades(collectionA, collectionB);
+  
+  console.log(`Trade analysis complete:`);
+  console.log(`- Perfect trades: ${tradeAnalysis.summary.totalPerfectTrades}`);
+  console.log(`- ${collectionA.username} can receive: ${tradeAnalysis.summary.totalOneWayToA}`);
+  console.log(`- ${collectionA.username} can give: ${tradeAnalysis.summary.totalOneWayToB}`);
+  console.log(`- Impossible trades: ${tradeAnalysis.summary.totalImpossible}`);
+  
+  return {
+    tradeAnalysis,
+    collectionA,
+    collectionB,
+    profiles: { profileA, profileB }
+  };
+}
+
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const { userA, userB } = await request.json();
     
-    if (!userA || !userB) {
-      return json({ error: 'Both userA and userB are required' }, { status: 400 });
-    }
-    
-    if (userA === userB) {
-      return json({ error: 'Cannot compare user with themselves' }, { status: 400 });
-    }
-    
-    console.log(`Starting trade comparison between "${userA}" and "${userB}"`);
-    
-    // Extract both user profiles in parallel
-    const [profileA, profileB] = await Promise.all([
-      extractUserProfile(userA, request),
-      extractUserProfile(userB, request)
-    ]);
-    
-    console.log(`Profile extraction complete:`);
-    console.log(`- ${profileA.username} (ID: ${profileA.id}): ${profileA.cards.length} cards`);
-    console.log(`- ${profileB.username} (ID: ${profileB.id}): ${profileB.cards.length} cards`);
-    
-    // Create user collections for trade analysis
-    const collectionA = tradeAnalyzer.createUserCollection(
-      profileA.username, 
-      profileA.id, 
-      profileA.profile, 
-      profileA.cards
-    );
-    
-    const collectionB = tradeAnalyzer.createUserCollection(
-      profileB.username,
-      profileB.id, 
-      profileB.profile,
-      profileB.cards
-    );
-    
-    // Analyze trade opportunities
-    console.log('Analyzing trade opportunities...');
-    const tradeAnalysis = tradeAnalyzer.analyzeTrades(collectionA, collectionB);
+    // Use the shared analysis function
+    const { tradeAnalysis, collectionA, collectionB } = await getTradeAnalysisForUsers(userA, userB, request);
     
     // Get available sets for filtering
     const availableSets = tradeAnalyzer.getAvailableSets(collectionA, collectionB);
@@ -86,11 +105,6 @@ export const POST: RequestHandler = async ({ request }) => {
     // Generate recommendations
     const recommendations = tradeAnalyzer.generateTradeRecommendations(tradeAnalysis, collectionA, collectionB);
     
-    console.log(`Trade analysis complete:`);
-    console.log(`- Perfect trades: ${tradeAnalysis.summary.totalPerfectTrades}`);
-    console.log(`- ${collectionA.username} can receive: ${tradeAnalysis.summary.totalOneWayToA}`);
-    console.log(`- ${collectionA.username} can give: ${tradeAnalysis.summary.totalOneWayToB}`);
-    console.log(`- Impossible trades: ${tradeAnalysis.summary.totalImpossible}`);
     console.log(`- Available sets: ${availableSets.length}`);
     
     return json({
@@ -130,33 +144,8 @@ export const GET: RequestHandler = async ({ url, request }) => {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '50');
     
-    if (!userA || !userB) {
-      return json({ error: 'Both userA and userB are required' }, { status: 400 });
-    }
-    
-    // Extract both user profiles
-    const [profileA, profileB] = await Promise.all([
-      extractUserProfile(userA, request),
-      extractUserProfile(userB, request)
-    ]);
-    
-    // Create user collections for trade analysis
-    const collectionA = tradeAnalyzer.createUserCollection(
-      profileA.username, 
-      profileA.id, 
-      profileA.profile, 
-      profileA.cards
-    );
-    
-    const collectionB = tradeAnalyzer.createUserCollection(
-      profileB.username,
-      profileB.id, 
-      profileB.profile,
-      profileB.cards
-    );
-    
-    // Analyze trade opportunities
-    let tradeAnalysis = tradeAnalyzer.analyzeTrades(collectionA, collectionB);
+    // Use the shared analysis function
+    let { tradeAnalysis } = await getTradeAnalysisForUsers(userA!, userB!, request);
     
     // Filter by set if specified
     if (setId && setId !== 'all') {
