@@ -58,6 +58,8 @@
   let error = $state('');
   let extractionInfo = $state<any>(null);
   let forceRefresh = $state(false);
+  let showCachePrompt = $state(false);
+  let cachedDataInfo = $state<any>(null);
   let retryAttempt = $state(0);
   let loadingMessage = $state('Starting extraction...');
   
@@ -520,23 +522,61 @@
     if (!forceRefresh) {
       const cached = cacheUtils.loadFromCache(ripUserId.trim());
       if (cached) {
-        console.log('Loading data from cache for user:', ripUserId.trim());
-        extractedData = cached.data;
-        extractionInfo = {
-          source: 'cache',
+        // Calculate cache age
+        const cacheAge = Date.now() - new Date(cached.timestamp).getTime();
+        const ageInMinutes = Math.floor(cacheAge / 60000);
+        const ageInHours = Math.floor(ageInMinutes / 60);
+        
+        // Store cache info for prompt
+        cachedDataInfo = {
+          data: cached.data,
           timestamp: cached.timestamp,
-          userId: ripUserId.trim()
+          ageInMinutes,
+          ageInHours,
+          ageText: ageInHours > 0 ? `${ageInHours} hour${ageInHours > 1 ? 's' : ''} ago` : `${ageInMinutes} minute${ageInMinutes !== 1 ? 's' : ''} ago`
         };
-        // Don't return here, let the normal flow continue to populate cardsBySet
+        
+        // Show smart prompt for cache freshness
+        showCachePrompt = true;
         return;
       }
     }
+    
+    // Proceed with fresh extraction
+    await performExtraction();
+  }
+  
+  function useCachedData() {
+    if (cachedDataInfo) {
+      console.log('Using cached data for user:', ripUserId.trim());
+      extractedData = cachedDataInfo.data;
+      extractionInfo = {
+        source: 'cache',
+        timestamp: cachedDataInfo.timestamp,
+        userId: ripUserId.trim(),
+        cached: true,
+        cacheAge: cachedDataInfo.ageText
+      };
+      showCachePrompt = false;
+      cachedDataInfo = null;
+    }
+  }
+  
+  async function getFreshData() {
+    showCachePrompt = false;
+    forceRefresh = true;
+    await performExtraction();
+  }
+  
+  async function performExtraction() {
 
     loading = true;
     error = '';
     extractedData = null;
     extractionInfo = null;
     retryAttempt = 0;
+    showCachePrompt = false;
+    cachedDataInfo = null;
     loadingMessage = forceRefresh ? 'Refreshing profile data from rip.fun...' : 'Fetching profile data from rip.fun...';
 
     // Set up periodic message updates to show progress
@@ -577,7 +617,9 @@
       extractionInfo = {
         username: result.username,
         targetUrl: result.targetUrl,
-        timestamp: result.timestamp
+        timestamp: result.timestamp,
+        cached: false,
+        source: 'live'
       };
       
       // Save to cache
@@ -871,6 +913,53 @@
             </div>
           {/if}
 
+          {#if showCachePrompt && cachedDataInfo}
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div class="flex items-start">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                  </svg>
+                </div>
+                <div class="ml-3 flex-1">
+                  <h3 class="text-sm font-medium text-blue-800">
+                    💡 Cached data available
+                  </h3>
+                  <div class="mt-2 text-sm text-blue-700">
+                    <p>We have cached data for this user from <strong>{cachedDataInfo.ageText}</strong>.</p>
+                    <p class="mt-2">
+                      {#if cachedDataInfo.ageInMinutes < 30}
+                        The data is still fresh! Use cached unless you just made changes.
+                      {:else if cachedDataInfo.ageInMinutes < 120}
+                        Just opened packs or traded cards? Get fresh data. Otherwise, cached is fine.
+                      {:else if cachedDataInfo.ageInHours < 24}
+                        Data is {cachedDataInfo.ageInHours} hours old. Consider refreshing if you've been active.
+                      {:else}
+                        Data is over a day old. We recommend getting fresh data.
+                      {/if}
+                    </p>
+                  </div>
+                  <div class="mt-4 flex space-x-3">
+                    <button
+                      onclick={getFreshData}
+                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      🔄 Get Fresh Data
+                      <span class="ml-2 text-xs opacity-90">(slower)</span>
+                    </button>
+                    <button
+                      onclick={useCachedData}
+                      class="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      📦 Use Cached
+                      <span class="ml-2 text-xs text-blue-600">({cachedDataInfo.ageText}, instant)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {/if}
+
           <div class="flex space-x-3">
             <button
               onclick={runExtraction}
@@ -894,11 +983,11 @@
             
             {#if extractedData}
               <button
-                onclick={() => { 
+                onclick={async () => { 
                   forceRefresh = true; 
                   cacheUtils.clearUserCache(ripUserId.trim());
                   // Note: We don't clear set caches since set data is static and doesn't change
-                  runExtraction(); 
+                  await performExtraction(); 
                 }}
                 disabled={loading}
                 class="inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
@@ -957,11 +1046,11 @@
                   <dt class="text-sm font-medium text-gray-500">Source</dt>
                   <dd class="text-sm text-gray-900">
                     {#if extractionInfo.source === 'cache'}
-                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        📦 Cached
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" title="{extractionInfo.cacheAge ? `Data from ${extractionInfo.cacheAge}` : 'Cached data'}">
+                        📦 Cached {extractionInfo.cacheAge ? `(${extractionInfo.cacheAge})` : ''}
                       </span>
                     {:else}
-                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800" title="Fresh data from rip.fun">
                         🌐 Live
                       </span>
                     {/if}

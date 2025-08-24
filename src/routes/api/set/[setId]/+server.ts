@@ -60,10 +60,10 @@ export const GET: RequestHandler = async ({ params, url }) => {
       });
     }
 
-    // Cache the cleaned data for 7 days (Pokemon set data rarely changes)
+    // Cache the cleaned data permanently (Pokemon set data is static)
     try {
-      await redisCache.set(cacheKey, data, 7 * 24 * 3600); // 7 days in seconds
-      console.log(`🔴 Cache STORED for set data: ${setId}`);
+      await redisCache.set(cacheKey, data); // No TTL = permanent cache
+      console.log(`🔴 Cache STORED PERMANENTLY for set data: ${setId}`);
     } catch (cacheError) {
       // Don't fail the request if caching fails
       console.warn('Failed to cache set data:', cacheError);
