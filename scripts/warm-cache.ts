@@ -11,26 +11,38 @@
 import { redisCache } from '../src/lib/server/redis/client.js';
 import { optimizeExtractedData } from '../src/lib/server/services/normalizer.js';
 
-// Common Pokemon TCG sets that should always be cached
+// Pokemon TCG sets that should always be cached
+// Based on real user data (tk_'s collection) + popular classic sets
 const POPULAR_SETS = [
-  'sv3pt5',     // Pokemon 151
-  'sv1-151',    // Scarlet & Violet 151
-  'sv2-151',    // Paldea Evolved 151
+  // From tk_'s actual collection (user 1229)
+  'rsv10pt5',   // Stellar Crown (from tk_)
+  'sm115',      // Hidden Fates (from tk_)
+  'sm3',        // Burning Shadows (from tk_)
+  'sv1',        // Scarlet & Violet Base (from tk_)
+  'sv10',       // Temporal Forces (from tk_)
+  'sv3',        // Obsidian Flames (from tk_)
+  'sv3pt5',     // Pokemon 151 (from tk_)
+  'sv6pt5',     // Twilight Masquerade (from tk_)
+  'sv7',        // Stellar Crown (from tk_)
+  'sv8pt5',     // Surging Sparks (from tk_)
+  'swsh12pt5',  // Crown Zenith (from tk_)
+  'swsh7',      // Evolving Skies (from tk_)
+  'swsh8',      // Fusion Strike (from tk_)
+  'zsv10pt5',   // Temporal Forces alt (from tk_)
+  
+  // Additional popular/classic sets
   'sv4',        // Paradox Rift
   'sv5',        // Temporal Forces
   'sv6',        // Twilight Masquerade
-  'sv7',        // Stellar Crown
   'sv8',        // Surging Sparks
-  'sv09',       // Scarlet & Violet Prismatic Evolutions
-  'swsh12pt5',  // Crown Zenith
-  'swsh11',     // Lost Origin
-  'swsh10',     // Astral Radiance
+  'sv09',       // Prismatic Evolutions
   'swsh9',      // Brilliant Stars
+  'swsh10',     // Astral Radiance
+  'swsh11',     // Lost Origin
   'cel25',      // Celebrations
   'base1',      // Base Set
   'base2',      // Jungle
   'base3',      // Fossil
-  'base4',      // Base Set 2
   'neo1',       // Neo Genesis
 ];
 
