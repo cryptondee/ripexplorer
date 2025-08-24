@@ -4,6 +4,8 @@
   import CardGrid from '$lib/components/CardGrid.svelte';
   import CardTable from '$lib/components/CardTable.svelte';
   import PackManager from '$lib/components/PackManager.svelte';
+  import { getSetNameFromCard } from '$lib/utils/card';
+  import { getMarketValue, getListedPrice } from '$lib/utils/pricing';
 
   // Wrapper functions for cache operations with in-memory state management
   function clearAllSetCaches(): void {
@@ -16,20 +18,34 @@
     setCardsData = {}; // Clear in-memory set cache too
   }
 
-  // Helper function to get human-readable set name
-  function getSetName(card: any): string {
-    // First try to get from the set object
-    if (card.set?.name) return card.set.name;
-    
-    // If no set object, try to derive from setCardsData using set_id
-    const setId = card.card?.set_id;
-    if (setId && setCardsData[setId]?.cards?.[0]?.set?.name) {
-      return setCardsData[setId].cards[0].set.name;
-    }
-    
-    // Fallback to set_id or Unknown
-    return card.card?.set_id || 'Unknown';
+  // Resolve set name with cache fallback and ignore numeric-only names like "151"
+  function resolveSetName(card: any): string {
+    const numericOnly = (s: any) => typeof s === 'string' && /^\d+$/.test(s.trim());
+    const setId = card?.set?.id || card?.card?.set_id || card?.set_id;
+    const primary = getSetNameFromCard(card);
+
+    // Known mappings for sets where name is provided as a numeric code
+    const knownSetNames: Record<string, string> = {
+      sv3pt5: 'Scarlet & Violet 151'
+    };
+    if (setId && knownSetNames[setId]) return knownSetNames[setId];
+
+    // If primary is a non-numeric, prefer it
+    if (primary && !numericOnly(primary) && primary !== setId && primary !== 'Unknown Set') return primary;
+
+    // Prefer cached set metadata name if available
+    const cachedName = setId && (setCardsData?.[setId]?.set?.name || setCardsData?.[setId]?.cards?.[0]?.set?.name);
+    if (cachedName && !numericOnly(cachedName)) return cachedName;
+
+    // Fall back to top-level digital card set.name if non-numeric
+    const topLevelName = card?.set?.name;
+    if (topLevelName && !numericOnly(topLevelName)) return topLevelName;
+
+    // Last resort: primary or setId or Unknown
+    return primary && !numericOnly(primary) ? primary : (setId || 'Unknown Set');
   }
+
+  // Set name resolution now handled in components via $lib/utils/card.ts
 
   let ripUserId = $state('');
   let searchResults = $state<any[]>([]);
@@ -85,8 +101,8 @@
           bValue = b.card?.name || '';
           break;
         case 'set':
-          aValue = getSetName(a);
-          bValue = getSetName(b);
+          aValue = resolveSetName(a);
+          bValue = resolveSetName(b);
           break;
         case 'rarity':
           aValue = a.card?.rarity || '';
@@ -97,13 +113,12 @@
           bValue = b.card?.types?.join(', ') || '';
           break;
         case 'value':
-          aValue = parseFloat(a.listing?.usd_price || a.card?.raw_price || '0');
-          bValue = parseFloat(b.listing?.usd_price || b.card?.raw_price || '0');
+          aValue = getMarketValue(a);
+          bValue = getMarketValue(b);
           break;
         case 'listedPrice':
-          // For missing cards, use lowestPrice; for owned cards, use existing price logic
-          aValue = a.isMissing ? (a.lowestPrice || 0) : parseFloat(a.listing?.usd_price || a.card?.raw_price || '0');
-          bValue = b.isMissing ? (b.lowestPrice || 0) : parseFloat(b.listing?.usd_price || b.card?.raw_price || '0');
+          aValue = getListedPrice(a);
+          bValue = getListedPrice(b);
           break;
         default:
           return 0;
@@ -183,7 +198,7 @@
       const matchesSearch = !searchQuery || 
         (card.card?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (card.card?.card_number || '').includes(searchQuery) ||
-        getSetName(card).toLowerCase().includes(searchQuery.toLowerCase());
+        resolveSetName(card).toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesRarity = selectedRarity === 'all' || card.card?.rarity === selectedRarity;
       
@@ -320,7 +335,6 @@
             is_listed: isListed, // Whether the card has active listings
             listing: listingData, // Full listing data
             lowestPrice: lowestPrice, // Lowest available price
-            buyNowUrl: `https://www.rip.fun/card/${card.id}`, // Buy now URL
             marketValue: card.market_price || card.raw_price // Market value for missing cards
           };
         })
@@ -393,6 +407,7 @@
   
   // Reactive cardsBySet calculation
   let cardsBySet = $state<any>({});
+  let setNameById = $state<Record<string, string>>({});
 
   // Calculate cardsBySet when extractedData changes
   $effect(() => {
@@ -402,7 +417,7 @@
     }
 
     cardsBySet = extractedData.profile.digital_cards.reduce((sets: any, card: any) => {
-      const setName = getSetName(card);
+      const setName = resolveSetName(card);
       const setId = card.set?.id || card.card?.set_id || 'unknown';
       if (!sets[setName]) {
         sets[setName] = {
@@ -427,6 +442,19 @@
       
       return sets;
     }, {});
+
+    // Build setNameById from setCardsData cache, preferring set metadata name and skipping numeric-only names
+    const numericOnly = (s: any) => typeof s === 'string' && /^\d+$/.test(s.trim());
+    const map: Record<string, string> = {};
+    for (const [id, data] of Object.entries(setCardsData || {})) {
+      const metaName = (data as any)?.set?.name as string | undefined;
+      const cardName = (data as any)?.cards?.[0]?.set?.name as string | undefined;
+      const chosen = metaName && !numericOnly(metaName) ? metaName : (cardName && !numericOnly(cardName) ? cardName : undefined);
+      if (id && chosen) map[id] = chosen;
+    }
+    // Ensure known mappings exist even if cache lacks proper names
+    map['sv3pt5'] = map['sv3pt5'] || 'Scarlet & Violet 151';
+    setNameById = map;
   });
 
   // Update combined cards when relevant state changes
@@ -1076,7 +1104,7 @@
             <!-- Set Statistics -->
             {#if extractedData.profile.digital_cards && extractedData.profile.digital_cards.length > 0}
               {@const setStats = extractedData.profile.digital_cards.reduce((stats: any, card: any) => {
-                const setName = getSetName(card);
+                const setName = resolveSetName(card);
                 const rarity = card.card?.rarity || 'Unknown';
                 const value = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
                 
@@ -1206,14 +1234,16 @@
                     {selectedSet}
                     {cardsBySet}
                     paginatedCards={paginatedCards}
-                    on:cardClick={(e) => openCardModal(e.detail.card, e.detail.cards)}
+                    on:cardClick={(e) => openCardModal(e.detail)}
                   />
                 {:else}
                   <CardTable
                     paginatedCards={paginatedCards}
                     {sortColumn}
                     {sortDirection}
-                    on:cardClick={(e) => openCardModal(e.detail.card, e.detail.cards)}
+                    {setNameById}
+                    {resolveSetName}
+                    on:cardClick={(e) => openCardModal(e.detail)}
                     on:sort={(e) => handleSort(e.detail.column)}
                   />
                 {/if}
@@ -1345,7 +1375,7 @@
             <dl class="space-y-2 text-sm">
               <div class="flex justify-between">
                 <dt class="text-gray-500">Set:</dt>
-                <dd class="text-gray-900">{getSetName(selectedCard)}</dd>
+                <dd class="text-gray-900">{resolveSetName(selectedCard)}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Rarity:</dt>

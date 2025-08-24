@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { buildRipCardUrl } from '$lib/utils/url';
 
   // Props
   export let selectedSet: string = 'all';
@@ -194,7 +195,7 @@
               <div class="flex gap-1">
                 {#if card.marketplaceData.hasListings}
                   <a 
-                    href="https://www.rip.fun/cards/{card.card?.id || card.card?.name?.replace(/\s+/g, '-').toLowerCase()}"
+                    href={buildRipCardUrl(card.card || card)}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="flex-1 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 text-center"
@@ -203,7 +204,7 @@
                   </a>
                 {:else}
                   <a 
-                    href="https://www.rip.fun/cards/{card.card?.id || card.card?.name?.replace(/\s+/g, '-').toLowerCase()}"
+                    href={buildRipCardUrl(card.card || card)}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="flex-1 px-2 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500 text-center"

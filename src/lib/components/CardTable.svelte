@@ -1,10 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { buildRipCardUrl } from '$lib/utils/url';
+  import { getSetNameFromCard } from '$lib/utils/card';
 
   // Props
   export let paginatedCards: any[] = [];
   export let sortColumn: string = '';
   export let sortDirection: 'asc' | 'desc' = 'asc';
+  export let setNameById: Record<string, string> = {};
+  export let resolveSetName: (card: any) => string;
 
   // Event dispatcher
   const dispatch = createEventDispatcher<{
@@ -21,11 +25,14 @@
     dispatch('sort', { column, direction: newDirection });
   }
 
-  function getSetName(card: any): string {
-    // Helper function to get human-readable set name
-    if (card.set?.name) return card.set.name;
-    if (card.card?.set?.name) return card.card.set.name;
-    return card.card?.set_id || 'Unknown Set';
+  // Local fallback resolver used only if parent didn't provide one
+  function localResolveSetName(card: any): string {
+    const numericOnly = (s: any) => typeof s === 'string' && /^\d+$/.test(s.trim());
+    const primary = getSetNameFromCard(card);
+    const setId = card?.set?.id || card?.card?.set_id || card?.set_id;
+    if (primary && !numericOnly(primary) && primary !== setId) return primary;
+    if (setId && setNameById[setId]) return setNameById[setId];
+    return primary && !numericOnly(primary) ? primary : (setId || primary || 'Unknown Set');
   }
 
   function getRowClass(card: any): string {
@@ -41,8 +48,7 @@
   }
 
   function getBuyNowUrl(card: any): string {
-    const cardIdentifier = card.card?.id || card.card?.name?.replace(/\s+/g, '-').toLowerCase();
-    return `https://www.rip.fun/cards/${cardIdentifier}`;
+    return buildRipCardUrl(card.card || card);
   }
 
   function formatPrice(price: any): string {
@@ -227,7 +233,7 @@
 
           <!-- Set Column -->
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            {getSetName(card)}
+            {resolveSetName(card)}
           </td>
 
           <!-- Rarity Column -->
@@ -244,27 +250,37 @@
 
           <!-- Value Column -->
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            {#if card.isMissing && card.marketValue}
-              ${formatPrice(card.marketValue)}
-            {:else if card.listing}
-              <span class="text-green-600 font-medium">${formatPrice(card.listing.usd_price)}</span>
-            {:else if card.card?.raw_price}
-              ${formatPrice(card.card.raw_price)}
+            {#if card.isMissing}
+              {#if card.marketValue}
+                ${formatPrice(card.marketValue)}
+              {:else if card.card?.raw_price}
+                ${formatPrice(card.card.raw_price)}
+              {:else}
+                —
+              {/if}
             {:else}
-              —
+              {#if card.card?.raw_price}
+                ${formatPrice(card.card.raw_price)}
+              {:else}
+                —
+              {/if}
             {/if}
           </td>
 
           <!-- Listed Price Column -->
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            {#if card.isMissing && card.lowestPrice}
-              ${formatPrice(card.lowestPrice)}
-            {:else if card.listing}
-              <span class="text-green-600 font-medium">${formatPrice(card.listing.usd_price)}</span>
-            {:else if card.card?.raw_price}
-              ${formatPrice(card.card.raw_price)}
+            {#if card.isMissing}
+              {#if card.is_listed && card.lowestPrice}
+                <span class="text-green-600 font-medium">${formatPrice(card.lowestPrice)}</span>
+              {:else}
+                <span class="text-gray-400">Not listed</span>
+              {/if}
             {:else}
-              —
+              {#if card.listing?.usd_price}
+                <span class="text-green-600 font-medium">${formatPrice(card.listing.usd_price)}</span>
+              {:else}
+                <span class="text-gray-400">Not listed</span>
+              {/if}
             {/if}
           </td>
 
