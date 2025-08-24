@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { redisCache, CacheKeys } from '$lib/server/redis/client.js';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, url }) => {
@@ -7,6 +8,20 @@ export const GET: RequestHandler = async ({ params, url }) => {
   if (!setId) {
     return json({ error: 'Set ID is required' }, { status: 400 });
   }
+
+  // Check cache first
+  const cacheKey = CacheKeys.setData(setId);
+  const cachedData = await redisCache.get(cacheKey);
+  
+  if (cachedData) {
+    console.log(`🔴 Cache HIT for set data: ${setId}`);
+    return json({
+      ...cachedData,
+      cached: true
+    });
+  }
+  
+  console.log(`🔴 Cache MISS for set data: ${setId}`);
 
   try {
     // Get query parameters from the request
@@ -45,7 +60,19 @@ export const GET: RequestHandler = async ({ params, url }) => {
       });
     }
 
-    return json(data);
+    // Cache the cleaned data for 7 days (Pokemon set data rarely changes)
+    try {
+      await redisCache.set(cacheKey, data, 7 * 24 * 3600); // 7 days in seconds
+      console.log(`🔴 Cache STORED for set data: ${setId}`);
+    } catch (cacheError) {
+      // Don't fail the request if caching fails
+      console.warn('Failed to cache set data:', cacheError);
+    }
+
+    return json({
+      ...data,
+      cached: false
+    });
   } catch (error) {
     console.error(`Error fetching set ${setId} data:`, error);
     

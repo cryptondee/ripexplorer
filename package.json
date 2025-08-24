@@ -5,13 +5,17 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:redis": "docker-compose up -d redis && npm run dev",
 		"build": "prisma generate && vite build",
 		"preview": "vite preview",
 		"start": "node build",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"postinstall": "prisma generate"
+		"postinstall": "prisma generate",
+		"redis:start": "docker-compose up -d redis",
+		"redis:stop": "docker-compose down redis",
+		"redis:logs": "docker-compose logs -f redis"
 	},
 	"dependencies": {
 		"@prisma/client": "^5.22.0",
@@ -19,6 +23,7 @@
 		"alchemy-sdk": "^3.6.3",
 		"autoprefixer": "^10.4.16",
 		"cheerio": "^1.0.0",
+		"ioredis": "^5.7.0",
 		"postcss": "^8.4.31",
 		"tailwindcss": "^3.4.0",
 		"viem": "^2.34.0"

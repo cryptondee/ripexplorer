@@ -86,6 +86,9 @@
   let fetchingAllSets = $state(false);
   let bulkFetchErrors = $state<string[]>([]);
   
+  // JSON display toggle
+  let showJsonData = $state(false);
+  
   // Sorting function
   function sortCards(cards: any[]) {
     return [...cards].sort((a, b) => {
@@ -917,19 +920,29 @@
         <div class="bg-white shadow rounded-lg p-6">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-lg font-medium text-gray-900">Extracted Data</h2>
-            <div class="flex space-x-2">
-              <button
-                onclick={copyToClipboard}
-                class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-              >
-                📋 Copy
-              </button>
-              <button
-                onclick={downloadJSON}
-                class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-              >
-                📁 Download JSON
-              </button>
+            <div class="flex items-center space-x-3">
+              <label class="flex items-center">
+                <input
+                  type="checkbox"
+                  bind:checked={showJsonData}
+                  class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <span class="ml-2 text-sm text-gray-700">Show JSON Data</span>
+              </label>
+              <div class="flex space-x-2">
+                <button
+                  onclick={copyToClipboard}
+                  class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  📋 Copy
+                </button>
+                <button
+                  onclick={downloadJSON}
+                  class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+                  📁 Download JSON
+                </button>
+              </div>
             </div>
           </div>
           
@@ -1001,9 +1014,11 @@
             </div>
           {/if}
           
-          <div class="bg-gray-900 rounded p-4 overflow-auto max-h-96">
-            <pre class="text-xs text-green-400 font-mono whitespace-pre-wrap">{JSON.stringify(extractedData, null, 2)}</pre>
-          </div>
+          {#if showJsonData}
+            <div class="bg-gray-900 rounded p-4 overflow-auto max-h-96">
+              <pre class="text-xs text-green-400 font-mono whitespace-pre-wrap">{JSON.stringify(extractedData, null, 2)}</pre>
+            </div>
+          {/if}
         </div>
 
         {#if extractedData.profile}

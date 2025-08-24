@@ -6,3 +6,10 @@ startCommand = "npm start"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
+
+# Redis plugin for all environments
+[environments.production]
+plugins = ["redis"]
+
+[environments.staging]  
+plugins = ["redis"]

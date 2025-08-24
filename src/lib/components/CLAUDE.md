@@ -13,7 +13,7 @@ Each component follows established patterns:
 
 ## 📦 Components
 
-### CardFilters.svelte (247 lines)
+### CardFilters.svelte (248 lines)
 **Purpose**: Complete filtering interface for card management with advanced options
 
 **Key Features:**
@@ -88,7 +88,7 @@ Each component follows established patterns:
 }
 ```
 
-### CardTable.svelte (332 lines)
+### CardTable.svelte (349 lines)
 **Purpose**: Comprehensive sortable data table with marketplace integration
 
 **Key Features:**
@@ -120,7 +120,7 @@ Each component follows established patterns:
 - Action (Buy Now/Make Offer buttons)
 - Status (Listed/Owned/Missing badges)
 
-### PackManager.svelte (201 lines)
+### PackManager.svelte (202 lines)
 **Purpose**: Intelligent pack grouping and management with expandable details
 
 **Key Features:**
@@ -171,7 +171,7 @@ Each component follows established patterns:
 }
 ```
 
-### UserSearchInput.svelte (111 lines)
+### UserSearchInput.svelte (112 lines)
 **Purpose**: Intelligent username search with blockchain integration and autocomplete
 
 **Key Features:**

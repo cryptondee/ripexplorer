@@ -13,7 +13,7 @@ Utilities follow these principles:
 
 ## 🛠️ Utilities
 
-### cacheUtils.ts ⭐ **New - Post-Refactoring** (162 lines)
+### cacheUtils.ts ⭐ **New - Post-Refactoring** (163 lines)
 **Purpose**: Centralized localStorage management with intelligent caching strategies
 
 **Key Functionality:**
@@ -149,6 +149,133 @@ console.log(`Cache contains ${status.totalEntries} entries`);
 - **Reduced component complexity** by 50-100 lines per component
 - **Improved cache efficiency** with smart expiration strategies
 - **Enhanced user experience** with instant loading from cache
+
+### card.ts (8 lines)
+**Purpose**: Utilities for card data structure handling and set name resolution
+
+**Key Functionality:**
+- **Set name extraction** from various card data structures
+- **Fallback handling** for missing or malformed set information
+- **Consistent card data access** across components
+
+**Main Functions:**
+```typescript
+// Extract set name from nested card structures
+getSetNameFromCard(input: any): string
+```
+
+**Usage Examples:**
+```typescript
+import { getSetNameFromCard } from '$lib/utils/card';
+
+// Handles various card data structures
+const setName = getSetNameFromCard(cardData); // "Scarlet & Violet 151"
+const fallback = getSetNameFromCard(malformedCard); // "Unknown Set"
+```
+
+### pricing.ts (21 lines)
+**Purpose**: Centralized pricing utilities for market values and listed prices
+
+**Key Functionality:**
+- **Market value extraction** from card data with type safety
+- **Listed price calculation** for marketplace integration
+- **Consistent pricing logic** across all display components
+
+**Main Functions:**
+```typescript
+// Get market value with fallback handling
+getMarketValue(row: any): number
+
+// Get listed price for marketplace cards
+getListedPrice(row: any): number
+```
+
+**Usage Examples:**
+```typescript
+import { getMarketValue, getListedPrice } from '$lib/utils/pricing';
+
+// Safe price extraction
+const marketValue = getMarketValue(cardData); // 15.99
+const listedPrice = getListedPrice(cardData); // 12.50
+```
+
+### url.ts (16 lines)  
+**Purpose**: URL building utilities for rip.fun marketplace integration
+
+**Key Functionality:**
+- **Name slugification** for URL-safe card names
+- **Card URL construction** for marketplace links
+- **Input handling** for various card data structures
+
+**Main Functions:**
+```typescript
+// Create URL-safe slugs from card names
+slugifyName(name: string): string
+
+// Build rip.fun card URLs for marketplace links
+buildRipCardUrl(input: any): string
+```
+
+**Usage Examples:**
+```typescript
+import { buildRipCardUrl } from '$lib/utils/url';
+
+// Generate marketplace links
+const cardUrl = buildRipCardUrl(cardData); 
+// https://www.rip.fun/card/charizard-base-set-4
+```
+
+### trade/summaries.ts (108 lines)
+**Purpose**: Trade summary building utilities for consistent analysis presentation
+
+**Key Functionality:**
+- **User set summaries** with completion percentages
+- **Trade set analysis** with give/receive breakdowns
+- **Flexible data structure handling** with customizable formatters
+- **Sorting and organization** for optimal display
+
+**Main Types:**
+```typescript
+interface UserSetRow {
+  setId: string;
+  setName: string;
+  owned: number;
+  total: number;
+  percent: number; // 0..100
+}
+
+interface TradeSetRow {
+  setId: string;
+  setName: string;
+  receive: number;
+  give: number;
+}
+```
+
+**Main Functions:**
+```typescript
+// Build user collection summaries by set
+buildUserSetSummary(ownedCards: any[], opts: BuildOptions): UserSetRow[]
+
+// Build from pre-calculated counts
+buildUserSetSummaryFromCounts(counts: Record<string, number>, opts: BuildOptions): UserSetRow[]
+
+// Build trade analysis summaries
+buildTradeSetSummary(suggestions: TradeData[], perspective: 'A' | 'B', getSetName: Function): TradeSetRow[]
+```
+
+**Usage Examples:**
+```typescript
+import { buildUserSetSummary } from '$lib/utils/trade/summaries';
+
+// Generate user collection summary
+const summary = buildUserSetSummary(userCards, {
+  getSetId: (card) => card.set?.id,
+  getSetName: (id) => setNames[id] || id,
+  getSetTotal: (id) => setTotals[id] || 0
+});
+// Returns sorted array of set completion data
+```
 
 ## 🔧 Usage Patterns
 

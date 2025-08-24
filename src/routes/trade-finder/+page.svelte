@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import TradeTable from '$lib/components/TradeTable.svelte';
   import UserSearchInput from '$lib/components/UserSearchInput.svelte';
+  import SetSummaryTable from '$lib/components/trade/SetSummaryTable.svelte';
+  import { buildUserSetSummaryFromCounts } from '$lib/utils/trade/summaries';
   
   let userA = '';
   let userB = '';
@@ -19,6 +21,82 @@
   let availableSets: any[] = [];
   let availableRarities: string[] = [];
   let totalPages = 1;
+
+  // Caches and derived data for summaries
+  let setTotals: Record<string, number> = {};
+  let setNameById: Record<string, string> = {};
+  let userSummaryA: any[] = [];
+  let userSummaryB: any[] = [];
+  let summariesLoading = false;
+
+  function getSetName(id: string): string {
+    // Special-case mapping consistent with extract page
+    if (id === 'sv3pt5') return 'Scarlet & Violet 151';
+    return setNameById[id] || id || 'Unknown Set';
+  }
+
+  async function getSetTotal(id: string): Promise<number> {
+    if (!id) return 0;
+    if (setTotals[id] !== undefined) return setTotals[id];
+    try {
+      const res = await fetch(`/api/set/${id}`);
+      const data = await res.json();
+      const total = Array.isArray(data?.cards) ? data.cards.length : 0;
+      setTotals[id] = total;
+      return total;
+    } catch (e) {
+      setTotals[id] = 0;
+      return 0;
+    }
+  }
+
+  async function refreshSummaries(): Promise<void> {
+    if (!tradeResults) return;
+    // Ensure setNameById from availableSets
+    setNameById = Object.fromEntries((availableSets || []).map((s: any) => [s.id, s.name]));
+
+    const ownedA: Record<string, number> = tradeResults.ownedBySetA || {};
+    const ownedB: Record<string, number> = tradeResults.ownedBySetB || {};
+    const missingA: Record<string, number> = tradeResults.missingBySetA || {};
+    const missingB: Record<string, number> = tradeResults.missingBySetB || {};
+
+    summariesLoading = true;
+    try {
+      // Preload totals for all involved set ids (owned or missing)
+      const ids = Array.from(new Set([
+        ...Object.keys(ownedA),
+        ...Object.keys(ownedB),
+        ...Object.keys(missingA),
+        ...Object.keys(missingB)
+      ]));
+      await Promise.all(ids.map((id) => getSetTotal(id)));
+
+      // Build from owned counts but enforce Owned = Total - Missing (unique)
+      userSummaryA = buildUserSetSummaryFromCounts(ownedA, {
+        getSetName,
+        getSetTotal: (id: string) => setTotals[id] || 0,
+      }).map((row: any) => {
+        const total = setTotals[row.setId] ?? row.total ?? 0;
+        const missing = Number(missingA[row.setId] || 0);
+        const owned = Math.max(0, total - missing);
+        const percent = total > 0 ? Math.min(100, Math.round((owned / total) * 100)) : 0;
+        return { ...row, owned, total, percent };
+      }).sort((a: any, b: any) => (b.percent - a.percent) || a.setName.localeCompare(b.setName));
+
+      userSummaryB = buildUserSetSummaryFromCounts(ownedB, {
+        getSetName,
+        getSetTotal: (id: string) => setTotals[id] || 0,
+      }).map((row: any) => {
+        const total = setTotals[row.setId] ?? row.total ?? 0;
+        const missing = Number(missingB[row.setId] || 0);
+        const owned = Math.max(0, total - missing);
+        const percent = total > 0 ? Math.min(100, Math.round((owned / total) * 100)) : 0;
+        return { ...row, owned, total, percent };
+      }).sort((a: any, b: any) => (b.percent - a.percent) || a.setName.localeCompare(b.setName));
+    } finally {
+      summariesLoading = false;
+    }
+  }
 
 
   async function compareUsers(): Promise<void> {
@@ -71,6 +149,9 @@
         
         // Load filtered trades for the first time
         await loadFilteredTrades();
+
+        // Build summaries
+        await refreshSummaries();
       } else {
         error = data.error || 'Failed to compare users';
       }
@@ -251,6 +332,42 @@
               <p class="text-sm text-green-700">Cards Owned</p>
             </div>
           </div>
+        </div>
+
+        <!-- Set Completion Summaries -->
+        <div class="bg-white rounded-lg shadow-md p-8">
+          <h2 class="text-xl font-bold mb-6">🗂️ Set Completion</h2>
+          {#if summariesLoading}
+            <div class="flex items-center text-gray-600">
+              <div class="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+              Loading set summaries...
+            </div>
+          {:else if userSummaryA.length > 0 || userSummaryB.length > 0}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <SetSummaryTable
+                title={`${tradeResults.userA.username} — Sets Completed`}
+                rows={userSummaryA}
+                columns={[
+                  { key: 'setName', header: 'Set' },
+                  { key: 'owned', header: 'Owned', align: 'right' },
+                  { key: 'total', header: 'Total', align: 'right' },
+                  { key: 'percent', header: '%', align: 'right', formatter: (row) => `${row.percent}%` },
+                ]}
+              />
+              <SetSummaryTable
+                title={`${tradeResults.userB.username} — Sets Completed`}
+                rows={userSummaryB}
+                columns={[
+                  { key: 'setName', header: 'Set' },
+                  { key: 'owned', header: 'Owned', align: 'right' },
+                  { key: 'total', header: 'Total', align: 'right' },
+                  { key: 'percent', header: '%', align: 'right', formatter: (row) => `${row.percent}%` },
+                ]}
+              />
+            </div>
+          {:else}
+            <div class="text-gray-600">No set summary data</div>
+          {/if}
         </div>
 
         <!-- Trade Summary -->

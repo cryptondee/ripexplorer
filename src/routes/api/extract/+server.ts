@@ -3,17 +3,37 @@ import { fetchHTML } from '$lib/server/services/fetcher.js';
 import { extractSvelteKitData, sanitizeExtractedData, extractFromRipFunAPI } from '$lib/server/services/parser.js';
 import { cleanRipFunData } from '$lib/server/services/normalizer.js';
 import { userSyncService } from '$lib/server/services/userSync.js';
+import { redisCache, CacheKeys } from '$lib/server/redis/client.js';
 import type { RequestHandler } from './$types.js';
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { username, method = 'auto' } = await request.json();
+    const { username, method = 'auto', forceRefresh = false } = await request.json();
     
     if (!username) {
       return json({ error: 'Username is required' }, { status: 400 });
     }
     
     const trimmedInput = username.trim();
+    
+    // Check Redis cache first (unless force refresh requested)
+    if (!forceRefresh) {
+      const cacheKey = CacheKeys.extraction(trimmedInput);
+      const cachedResult = await redisCache.get(cacheKey);
+      
+      if (cachedResult) {
+        console.log(`🔴 Cache HIT for extraction: ${trimmedInput}`);
+        return json({
+          ...cachedResult,
+          cached: true,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      console.log(`🔴 Cache MISS for extraction: ${trimmedInput}`);
+    } else {
+      console.log(`🔴 Cache SKIP (force refresh) for extraction: ${trimmedInput}`);
+    }
     let resolvedUsername = trimmedInput;
     let resolvedUserId: number | null = null;
     let resolutionMethod = 'direct';
@@ -111,7 +131,8 @@ export const POST: RequestHandler = async ({ request }) => {
       throw new Error('No extraction method succeeded');
     }
     
-    return json({
+    // Prepare response data
+    const responseData = {
       username: resolvedUsername,
       originalInput: trimmedInput,
       resolvedUserId,
@@ -121,6 +142,21 @@ export const POST: RequestHandler = async ({ request }) => {
       extractionMethod,
       apiCallsMade,
       timestamp: new Date().toISOString()
+    };
+    
+    // Cache successful extraction for 1 hour (3600 seconds)
+    try {
+      const cacheKey = CacheKeys.extraction(trimmedInput);
+      await redisCache.set(cacheKey, responseData, 3600);
+      console.log(`🔴 Cache STORED for extraction: ${trimmedInput}`);
+    } catch (cacheError) {
+      // Don't fail the request if caching fails
+      console.warn('Failed to cache extraction result:', cacheError);
+    }
+    
+    return json({
+      ...responseData,
+      cached: false
     });
     
   } catch (error) {

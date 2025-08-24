@@ -2,6 +2,9 @@ import { json } from '@sveltejs/kit';
 import { tradeAnalyzer } from '$lib/server/services/tradeAnalyzer.js';
 import type { RequestHandler } from './$types.js';
 
+// Cache of setId -> Set of standardized card keys (matches TradeAnalyzer key format `card_<id>`)
+const setCardKeyCache: Map<string, Set<string>> = new Map();
+
 async function extractUserProfile(input: string, request: Request) {
   console.log(`Extracting profile for: ${input}`);
   
@@ -84,11 +87,80 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
   console.log(`- ${collectionA.username} can give: ${tradeAnalysis.summary.totalOneWayToB}`);
   console.log(`- Impossible trades: ${tradeAnalysis.summary.totalImpossible}`);
   
+  // Build lightweight per-user owned counts by set (unique cards only)
+  const ownedBySetA: Record<string, number> = {};
+  for (const card of collectionA.ownedCards.values()) {
+    const sid = card.set_id;
+    if (!sid) continue;
+    ownedBySetA[sid] = (ownedBySetA[sid] || 0) + 1;
+  }
+  const ownedBySetB: Record<string, number> = {};
+  for (const card of collectionB.ownedCards.values()) {
+    const sid = card.set_id;
+    if (!sid) continue;
+    ownedBySetB[sid] = (ownedBySetB[sid] || 0) + 1;
+  }
+
+  // Build accurate per-user missing counts by set using official set lists
+  const origin = new URL(request.url).origin;
+
+  async function getSetKeys(setId: string): Promise<Set<string>> {
+    if (setCardKeyCache.has(setId)) return setCardKeyCache.get(setId)!;
+    try {
+      const res = await fetch(`${origin}/api/set/${setId}`);
+      const data = await res.json();
+      const keys = new Set<string>();
+      const cards = Array.isArray(data?.cards) ? data.cards : [];
+      for (const c of cards) {
+        const id = c?.card?.id || c?.id;
+        if (!id) continue;
+        keys.add(`card_${id}`);
+      }
+      setCardKeyCache.set(setId, keys);
+      return keys;
+    } catch (e) {
+      console.error(`Failed to load set ${setId} for missing calc:`, e);
+      const empty = new Set<string>();
+      setCardKeyCache.set(setId, empty);
+      return empty;
+    }
+  }
+
+  async function computeMissingBySet(collection: typeof collectionA, ownedBySet: Record<string, number>): Promise<Record<string, number>> {
+    const result: Record<string, number> = {};
+    const setIds = Object.keys(ownedBySet);
+    // Preload all
+    await Promise.all(setIds.map((sid) => getSetKeys(sid)));
+    for (const sid of setIds) {
+      const setKeys = await getSetKeys(sid);
+      if (setKeys.size === 0) {
+        result[sid] = 0;
+        continue;
+      }
+      // Count how many of the set's keys the user already owns
+      let ownedInSet = 0;
+      for (const key of setKeys) {
+        if (collection.ownedCards.has(key)) ownedInSet += 1;
+      }
+      result[sid] = Math.max(0, setKeys.size - ownedInSet);
+    }
+    return result;
+  }
+
+  const [missingBySetA, missingBySetB] = await Promise.all([
+    computeMissingBySet(collectionA, ownedBySetA),
+    computeMissingBySet(collectionB, ownedBySetB)
+  ]);
+
   return {
     tradeAnalysis,
     collectionA,
     collectionB,
-    profiles: { profileA, profileB }
+    profiles: { profileA, profileB },
+    ownedBySetA,
+    ownedBySetB,
+    missingBySetA,
+    missingBySetB
   };
 }
 
@@ -97,7 +169,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const { userA, userB } = await request.json();
     
     // Use the shared analysis function
-    const { tradeAnalysis, collectionA, collectionB } = await getTradeAnalysisForUsers(userA, userB, request);
+    const { tradeAnalysis, collectionA, collectionB, ownedBySetA, ownedBySetB, missingBySetA, missingBySetB } = await getTradeAnalysisForUsers(userA, userB, request);
     
     // Get available sets for filtering
     const availableSets = tradeAnalyzer.getAvailableSets(collectionA, collectionB);
@@ -122,6 +194,10 @@ export const POST: RequestHandler = async ({ request }) => {
         profile: collectionB.profile
       },
       tradeAnalysis,
+      ownedBySetA,
+      ownedBySetB,
+      missingBySetA,
+      missingBySetB,
       availableSets,
       recommendations,
       timestamp: new Date().toISOString()
