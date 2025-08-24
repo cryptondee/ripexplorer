@@ -2,11 +2,15 @@ import { json } from '@sveltejs/kit';
 import { tradeAnalyzer } from '$lib/server/services/tradeAnalyzer.js';
 import type { RequestHandler } from './$types.js';
 
-async function extractUserProfile(input: string) {
+async function extractUserProfile(input: string, request: Request) {
   console.log(`Extracting profile for: ${input}`);
   
+  // Get the origin from the request to handle both dev and production
+  const origin = new URL(request.url).origin;
+  const extractUrl = `${origin}/api/extract`;
+  
   // Use the existing extract API endpoint internally
-  const extractResponse = await fetch('http://localhost:5173/api/extract', {
+  const extractResponse = await fetch(extractUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -49,8 +53,8 @@ export const POST: RequestHandler = async ({ request }) => {
     
     // Extract both user profiles in parallel
     const [profileA, profileB] = await Promise.all([
-      extractUserProfile(userA),
-      extractUserProfile(userB)
+      extractUserProfile(userA, request),
+      extractUserProfile(userB, request)
     ]);
     
     console.log(`Profile extraction complete:`);
@@ -118,7 +122,7 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 };
 
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, request }) => {
   try {
     const userA = url.searchParams.get('userA');
     const userB = url.searchParams.get('userB');
@@ -132,8 +136,8 @@ export const GET: RequestHandler = async ({ url }) => {
     
     // Extract both user profiles
     const [profileA, profileB] = await Promise.all([
-      extractUserProfile(userA),
-      extractUserProfile(userB)
+      extractUserProfile(userA, request),
+      extractUserProfile(userB, request)
     ]);
     
     // Create user collections for trade analysis
