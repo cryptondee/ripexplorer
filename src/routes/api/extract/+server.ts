@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { fetchHTML } from '$lib/server/services/fetcher.js';
 import { extractSvelteKitData, sanitizeExtractedData, extractFromRipFunAPI } from '$lib/server/services/parser.js';
-import { cleanRipFunData } from '$lib/server/services/normalizer.js';
+import { cleanRipFunData, optimizeExtractedData } from '$lib/server/services/normalizer.js';
 import { userSyncService } from '$lib/server/services/userSync.js';
 import { redisCache, CacheKeys } from '$lib/server/redis/client.js';
 import type { RequestHandler } from './$types.js';
@@ -78,9 +78,10 @@ export const POST: RequestHandler = async ({ request }) => {
         console.log(`Attempting API extraction for user: ${resolvedUsername} (ID: ${resolvedUserId || 'unknown'})`);
         // Use resolvedUserId if available, otherwise fall back to resolvedUsername (for numeric inputs)
         const extractionTarget = resolvedUserId ? resolvedUserId.toString() : resolvedUsername;
-        extractedData = await extractFromRipFunAPI(extractionTarget);
+        const rawExtractedData = await extractFromRipFunAPI(extractionTarget);
+        extractedData = optimizeExtractedData(rawExtractedData);
         extractionMethod = 'api';
-        apiCallsMade = extractedData.api_calls_made || 0;
+        apiCallsMade = rawExtractedData.api_calls_made || 0;
         
         const cardCount = extractedData.profile?.digital_cards?.length || 0;
         console.log(`API extraction successful: ${cardCount} cards`);
@@ -116,8 +117,9 @@ export const POST: RequestHandler = async ({ request }) => {
         const extractedRaw = extractSvelteKitData(html);
         const extractedClean = sanitizeExtractedData(extractedRaw);
         const extractedFiltered = cleanRipFunData(extractedClean);
+        const extractedOptimized = optimizeExtractedData(extractedFiltered);
         
-        extractedData = extractedFiltered;
+        extractedData = extractedOptimized;
         extractionMethod = 'html';
         
         console.log(`HTML extraction successful: ${extractedData.profile?.digital_cards?.length || 0} cards`);

@@ -15,7 +15,9 @@
 		"postinstall": "prisma generate",
 		"redis:start": "docker-compose up -d redis",
 		"redis:stop": "docker-compose down redis",
-		"redis:logs": "docker-compose logs -f redis"
+		"redis:logs": "docker-compose logs -f redis",
+		"cache:warm": "tsx scripts/warm-cache.ts",
+		"deploy:prepare": "npm run cache:warm"
 	},
 	"dependencies": {
 		"@prisma/client": "^5.22.0",
@@ -37,6 +39,7 @@
 		"prisma": "^5.22.0",
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
+		"tsx": "^4.20.5",
 		"typescript": "^5.0.0",
 		"vite": "^7.0.4"
 	}

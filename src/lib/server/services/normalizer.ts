@@ -151,6 +151,112 @@ export function cleanRipFunData(data: any): ExtractedData {
   return cleanedData;
 }
 
+/**
+ * Filter heavy gameplay fields from card data to reduce payload size
+ * Removes: subtype, hp, types, abilities, attacks, weaknesses, resistances
+ * Keeps: essential display and identification fields
+ */
+export function filterCardFields(card: any): any {
+  if (!card || typeof card !== 'object') {
+    return card;
+  }
+
+  const {
+    // Remove heavy gameplay fields
+    subtype,
+    hp,
+    types,
+    abilities,
+    attacks,
+    weaknesses,
+    resistances,
+    
+    // Keep all essential display fields
+    ...essentialFields
+  } = card;
+  
+  return essentialFields;
+}
+
+/**
+ * Replace full set object with set_id reference to reduce duplication
+ * Keeps the set object but removes heavy metadata
+ */
+export function optimizeSetReference(card: any): any {
+  if (!card?.set) {
+    return card;
+  }
+
+  // Keep only essential set fields, remove heavy metadata
+  const {
+    logo,
+    background_image_url,
+    value_score,
+    tcgplayer_id,
+    card_count,
+    series_id,
+    created_at,
+    updated_at,
+    ...essentialSetFields
+  } = card.set;
+
+  return {
+    ...card,
+    set: essentialSetFields
+  };
+}
+
+/**
+ * Apply all optimizations to extracted data
+ */
+export function optimizeExtractedData(data: any): any {
+  if (!data) return data;
+
+  // Handle array structure (multiple data objects)
+  if (Array.isArray(data)) {
+    return data.map(item => optimizeExtractedData(item));
+  }
+
+  // Handle single data object
+  if (typeof data === 'object' && data !== null) {
+    const optimized = { ...data };
+
+    // Process digital_cards in profile
+    if (optimized.profile?.digital_cards) {
+      optimized.profile.digital_cards = optimized.profile.digital_cards.map((digitalCard: any) => {
+        if (digitalCard.card) {
+          const optimizedCard = filterCardFields(digitalCard.card);
+          const withOptimizedSet = optimizeSetReference({ card: optimizedCard });
+          return {
+            ...digitalCard,
+            card: withOptimizedSet.card
+          };
+        }
+        return digitalCard;
+      });
+    }
+
+    // Process top-level cards array  
+    if (optimized.cards) {
+      optimized.cards = optimized.cards.map((cardObject: any) => {
+        if (cardObject.card) {
+          const optimizedCard = filterCardFields(cardObject.card);
+          const withOptimizedSet = optimizeSetReference({ card: optimizedCard });
+          return {
+            ...cardObject,
+            card: withOptimizedSet.card
+          };
+        }
+        return cardObject;
+      });
+    }
+
+    return optimized;
+  }
+
+  return data;
+}
+
 function removeUnusedKeys(data: ExtractedData): ExtractedData {
   const uselessKeys = [
     'id', 'uuid', 'timestamp', 'created_at', 'updated_at', 'version',
