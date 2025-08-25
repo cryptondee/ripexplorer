@@ -14,36 +14,26 @@ import { optimizeExtractedData } from '../src/lib/server/services/normalizer.js'
 // Pokemon TCG sets that should always be cached
 // Based on real user data (tk_'s collection) + popular classic sets
 const POPULAR_SETS = [
-  // From tk_'s actual collection (user 1229)
-  'rsv10pt5',   // Stellar Crown (from tk_)
-  'sm115',      // Hidden Fates (from tk_)
-  'sm3',        // Burning Shadows (from tk_)
-  'sv1',        // Scarlet & Violet Base (from tk_)
-  'sv10',       // Temporal Forces (from tk_)
-  'sv3',        // Obsidian Flames (from tk_)
-  'sv3pt5',     // Pokemon 151 (from tk_)
-  'sv6pt5',     // Twilight Masquerade (from tk_)
-  'sv7',        // Stellar Crown (from tk_)
-  'sv8pt5',     // Surging Sparks (from tk_)
-  'swsh12pt5',  // Crown Zenith (from tk_)
-  'swsh7',      // Evolving Skies (from tk_)
-  'swsh8',      // Fusion Strike (from tk_)
-  'zsv10pt5',   // Temporal Forces alt (from tk_)
-  
-  // Additional popular/classic sets
-  'sv4',        // Paradox Rift
+  'zsv10pt5',   // Black Bolt
+  'rsv10pt5',   // white flare
+  'sv10',       // Destinied rivals
+  'sv9',        // Journey togehter
+  'sv8pt5',        // Prismatic Evolutions
+  's8',         // Surging Sparks
+  'sv6pt5',     // Shrouded Fable
+  'sv7',        // Stellar Crown
+  'sv3pt5',     // Pokemon 151
+  'sv6',     // Twilight Masquerade
+  'swsh12pt5',  // Crown Zenith
+  'swsh7',      // Evolving Skies
+  'swsh8',      // Fusion Strike
   'sv5',        // Temporal Forces
-  'sv6',        // Twilight Masquerade
-  'sv8',        // Surging Sparks
-  'sv09',       // Prismatic Evolutions
-  'swsh9',      // Brilliant Stars
-  'swsh10',     // Astral Radiance
-  'swsh11',     // Lost Origin
-  'cel25',      // Celebrations
-  'base1',      // Base Set
-  'base2',      // Jungle
-  'base3',      // Fossil
-  'neo1',       // Neo Genesis
+  'sv4pt5',     // Paldean fates
+  'sv4',        // Paradox rift set
+
+  
+
+
 ];
 
 async function fetchSetData(setId: string) {

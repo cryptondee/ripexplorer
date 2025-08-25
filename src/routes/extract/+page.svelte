@@ -13,34 +13,7 @@
     console.log('Cleared in-memory set cache');
   }
 
-  // Resolve set name with cache fallback and ignore numeric-only names like "151"
-  function resolveSetName(card: any): string {
-    const numericOnly = (s: any) => typeof s === 'string' && /^\d+$/.test(s.trim());
-    const setId = card?.set?.id || card?.card?.set_id || card?.set_id;
-    const primary = getSetNameFromCard(card);
-
-    // Known mappings for sets where name is provided as a numeric code
-    const knownSetNames: Record<string, string> = {
-      sv3pt5: 'Scarlet & Violet 151'
-    };
-    if (setId && knownSetNames[setId]) return knownSetNames[setId];
-
-    // If primary is a non-numeric, prefer it
-    if (primary && !numericOnly(primary) && primary !== setId && primary !== 'Unknown Set') return primary;
-
-    // Prefer cached set metadata name if available
-    const cachedName = setId && (setCardsData?.[setId]?.set?.name || setCardsData?.[setId]?.cards?.[0]?.set?.name);
-    if (cachedName && !numericOnly(cachedName)) return cachedName;
-
-    // Fall back to top-level digital card set.name if non-numeric
-    const topLevelName = card?.set?.name;
-    if (topLevelName && !numericOnly(topLevelName)) return topLevelName;
-
-    // Last resort: primary or setId or Unknown
-    return primary && !numericOnly(primary) ? primary : (setId || 'Unknown Set');
-  }
-
-  // Set name resolution now handled in components via $lib/utils/card.ts
+  // Set name resolution handled by centralized utility
 
   let ripUserId = $state('');
   let searchResults = $state<any[]>([]);
@@ -99,8 +72,8 @@
           bValue = b.card?.name || '';
           break;
         case 'set':
-          aValue = resolveSetName(a);
-          bValue = resolveSetName(b);
+          aValue = getSetNameFromCard(a, setCardsData);
+          bValue = getSetNameFromCard(b, setCardsData);
           break;
         case 'rarity':
           aValue = a.card?.rarity || '';
@@ -196,7 +169,7 @@
       const matchesSearch = !searchQuery || 
         (card.card?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (card.card?.card_number || '').includes(searchQuery) ||
-        resolveSetName(card).toLowerCase().includes(searchQuery.toLowerCase());
+        getSetNameFromCard(card, setCardsData).toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesRarity = selectedRarity === 'all' || card.card?.rarity === selectedRarity;
       
@@ -404,7 +377,7 @@
     }
 
     cardsBySet = extractedData.profile.digital_cards.reduce((sets: any, card: any) => {
-      const setName = resolveSetName(card);
+      const setName = getSetNameFromCard(card, setCardsData);
       const setId = card.set?.id || card.card?.set_id || 'unknown';
       if (!sets[setName]) {
         sets[setName] = {
@@ -1081,7 +1054,7 @@
             <!-- Set Statistics -->
             {#if extractedData.profile.digital_cards && extractedData.profile.digital_cards.length > 0}
               {@const setStats = extractedData.profile.digital_cards.reduce((stats: any, card: any) => {
-                const setName = resolveSetName(card);
+                const setName = getSetNameFromCard(card, setCardsData);
                 const rarity = card.card?.rarity || 'Unknown';
                 const value = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');
                 
@@ -1219,7 +1192,7 @@
                     {sortColumn}
                     {sortDirection}
                     {setNameById}
-                    {resolveSetName}
+                    resolveSetName={(card) => getSetNameFromCard(card, setCardsData)}
                     on:cardClick={(e) => openCardModal(e.detail)}
                     on:sort={(e) => handleSort(e.detail.column)}
                   />
@@ -1352,7 +1325,7 @@
             <dl class="space-y-2 text-sm">
               <div class="flex justify-between">
                 <dt class="text-gray-500">Set:</dt>
-                <dd class="text-gray-900">{resolveSetName(selectedCard)}</dd>
+                <dd class="text-gray-900">{getSetNameFromCard(selectedCard, setCardsData)}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Rarity:</dt>
