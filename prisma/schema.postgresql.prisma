@@ -7,38 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Profile {
-  id          String   @id @default(cuid())
-  name        String
-  bio         String?
-  website     String?
-  twitter     String?
-  github      String?
-  linkedin    String?
-  wallet      String?
-  email       String?
-  location    String?
-  avatar      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  comparisons Comparison[]
-  
-  @@map("profiles")
-}
-
-model Comparison {
-  id          String   @id @default(cuid())
-  profileId   String
-  targetUrl   String
-  extractedData String @db.Text
-  differences   String @db.Text
-  createdAt     DateTime @default(now())
-  
-  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  
-  @@map("comparisons")
-}
 
 model RipUser {
   id                    Int      @id // rip.fun user ID

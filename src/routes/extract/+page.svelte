@@ -1,5 +1,4 @@
 <script lang="ts">
-  import * as cacheUtils from '$lib/utils/cacheUtils.js';
   import CardFilters from '$lib/components/CardFilters.svelte';
   import CardGrid from '$lib/components/CardGrid.svelte';
   import CardTable from '$lib/components/CardTable.svelte';
@@ -7,18 +6,11 @@
   import { getSetNameFromCard } from '$lib/utils/card';
   import { getMarketValue, getListedPrice } from '$lib/utils/pricing';
 
-  // Wrapper functions for cache operations with in-memory state management
+  // Cache operations now handled entirely by Redis backend
   function clearAllSetCaches(): void {
-    // Only clear in-memory cache since Redis handles persistent caching
+    // Clear in-memory set cache (Redis handles persistent caching)
     setCardsData = {};
     console.log('Cleared in-memory set cache');
-  }
-
-  function clearAllCaches(): void {
-    // Clear user data from localStorage but not set data (handled by Redis)
-    cacheUtils.clearAllCaches();
-    setCardsData = {}; // Clear in-memory set cache too
-    console.log('Cleared all caches');
   }
 
   // Resolve set name with cache fallback and ignore numeric-only names like "151"
@@ -61,8 +53,6 @@
   let error = $state('');
   let extractionInfo = $state<any>(null);
   let forceRefresh = $state(false);
-  let showCachePrompt = $state(false);
-  let cachedDataInfo = $state<any>(null);
   let retryAttempt = $state(0);
   let loadingMessage = $state('Starting extraction...');
   
@@ -510,55 +500,11 @@
       return;
     }
 
-    // Check cache first unless force refresh is requested
-    if (!forceRefresh) {
-      const cached = cacheUtils.loadFromCache(ripUserId.trim());
-      if (cached) {
-        // Calculate cache age
-        const cacheAge = Date.now() - new Date(cached.timestamp).getTime();
-        const ageInMinutes = Math.floor(cacheAge / 60000);
-        const ageInHours = Math.floor(ageInMinutes / 60);
-        
-        // Store cache info for prompt
-        cachedDataInfo = {
-          data: cached.data,
-          timestamp: cached.timestamp,
-          ageInMinutes,
-          ageInHours,
-          ageText: ageInHours > 0 ? `${ageInHours} hour${ageInHours > 1 ? 's' : ''} ago` : `${ageInMinutes} minute${ageInMinutes !== 1 ? 's' : ''} ago`
-        };
-        
-        // Show smart prompt for cache freshness
-        showCachePrompt = true;
-        return;
-      }
-    }
-    
-    // Proceed with fresh extraction
+    // Proceed with extraction (Redis caching handled by backend)
     await performExtraction();
   }
   
-  function useCachedData() {
-    if (cachedDataInfo) {
-      console.log('Using cached data for user:', ripUserId.trim());
-      extractedData = cachedDataInfo.data;
-      extractionInfo = {
-        source: 'cache',
-        timestamp: cachedDataInfo.timestamp,
-        userId: ripUserId.trim(),
-        cached: true,
-        cacheAge: cachedDataInfo.ageText
-      };
-      showCachePrompt = false;
-      cachedDataInfo = null;
-    }
-  }
   
-  async function getFreshData() {
-    showCachePrompt = false;
-    forceRefresh = true;
-    await performExtraction();
-  }
   
   async function performExtraction() {
 
@@ -567,8 +513,6 @@
     extractedData = null;
     extractionInfo = null;
     retryAttempt = 0;
-    showCachePrompt = false;
-    cachedDataInfo = null;
     loadingMessage = forceRefresh ? 'Refreshing profile data from rip.fun...' : 'Fetching profile data from rip.fun...';
 
     // Set up periodic message updates to show progress
@@ -614,9 +558,7 @@
         source: 'live'
       };
       
-      // Save to cache
-      cacheUtils.saveToCache(ripUserId.trim(), extractedData);
-      console.log('Saved user data to cache for:', ripUserId.trim());
+      // Caching handled by Redis backend
       
       loadingMessage = 'Extraction completed successfully!';
       
@@ -905,52 +847,6 @@
             </div>
           {/if}
 
-          {#if showCachePrompt && cachedDataInfo}
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div class="flex items-start">
-                <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                  </svg>
-                </div>
-                <div class="ml-3 flex-1">
-                  <h3 class="text-sm font-medium text-blue-800">
-                    💡 Cached data available
-                  </h3>
-                  <div class="mt-2 text-sm text-blue-700">
-                    <p>We have cached data for this user from <strong>{cachedDataInfo.ageText}</strong>.</p>
-                    <p class="mt-2">
-                      {#if cachedDataInfo.ageInMinutes < 30}
-                        The data is still fresh! Use cached unless you just made changes.
-                      {:else if cachedDataInfo.ageInMinutes < 120}
-                        Just opened packs or traded cards? Get fresh data. Otherwise, cached is fine.
-                      {:else if cachedDataInfo.ageInHours < 24}
-                        Data is {cachedDataInfo.ageInHours} hours old. Consider refreshing if you've been active.
-                      {:else}
-                        Data is over a day old. We recommend getting fresh data.
-                      {/if}
-                    </p>
-                  </div>
-                  <div class="mt-4 flex space-x-3">
-                    <button
-                      onclick={getFreshData}
-                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      🔄 Get Fresh Data
-                      <span class="ml-2 text-xs opacity-90">(slower)</span>
-                    </button>
-                    <button
-                      onclick={useCachedData}
-                      class="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      📦 Use Cached
-                      <span class="ml-2 text-xs text-blue-600">({cachedDataInfo.ageText}, instant)</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          {/if}
 
           <div class="flex space-x-3">
             <button
@@ -977,8 +873,6 @@
               <button
                 onclick={async () => { 
                   forceRefresh = true; 
-                  cacheUtils.clearUserCache(ripUserId.trim());
-                  // Note: We don't clear set caches since set data is static and doesn't change
                   await performExtraction(); 
                 }}
                 disabled={loading}
@@ -1074,21 +968,8 @@
                   <summary class="cursor-pointer text-gray-600 hover:text-gray-900 select-none">
                     Advanced Cache Options
                   </summary>
-                  <div class="mt-2 space-x-2">
-                    <button
-                      onclick={clearAllSetCaches}
-                      class="text-xs px-2 py-1 border border-gray-300 rounded text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                      title="Clear all Pokemon TCG set data caches"
-                    >
-                      Clear Set Caches
-                    </button>
-                    <button
-                      onclick={clearAllCaches}
-                      class="text-xs px-2 py-1 border border-red-300 rounded text-red-600 hover:text-red-900 hover:bg-red-50"
-                      title="Clear all cached data (user + set data)"
-                    >
-                      Clear All Caches
-                    </button>
+                  <div class="mt-2 text-xs text-gray-600">
+                    Cache management now handled by Redis backend
                   </div>
                 </details>
               </div>
