@@ -15,9 +15,6 @@ export function getCacheKey(userId: string): string {
   return `ripexplorer_cache_${userId}`;
 }
 
-export function getSetCacheKey(setId: string): string {
-  return `ripexplorer_set_${setId}`;
-}
 
 // User cache operations
 export function saveToCache(userId: string, data: any): void {
@@ -58,25 +55,7 @@ export function clearUserCache(userId: string): void {
   }
 }
 
-// Set cache operations (for Pokemon TCG sets)
-// DEPRECATED: Set caching now handled by Redis on backend
-export function saveSetToCache(setId: string, data: any): void {
-  // No-op: Set data caching moved to Redis backend to avoid localStorage quota issues
-  console.log(`Set data caching handled by Redis backend for: ${setId}`);
-}
-
-// DEPRECATED: Set caching now handled by Redis on backend
-export function loadSetFromCache(setId: string): CacheData | null {
-  // No-op: Set data caching moved to Redis backend
-  return null;
-}
-
-// Bulk cache management
-// DEPRECATED: Set caching now handled by Redis on backend
-export function clearAllSetCaches(): void {
-  // No-op: Set data caching moved to Redis backend
-  console.log('Set cache clearing handled by Redis backend');
-}
+// Set cache operations removed - now handled by Redis backend
 
 export function clearAllCaches(): void {
   try {
