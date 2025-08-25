@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  name        String
+  bio         String?
+  website     String?
+  twitter     String?
+  github      String?
+  linkedin    String?
+  wallet      String?
+  email       String?
+  location    String?
+  avatar      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  comparisons Comparison[]
+  
+  @@map("profiles")
+}
+
+model Comparison {
+  id          String   @id @default(cuid())
+  profileId   String
+  targetUrl   String
+  extractedData String @db.Text
+  differences   String @db.Text
+  createdAt     DateTime @default(now())
+  
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  @@map("comparisons")
+}
+
+model RipUser {
+  id                    Int      @id // rip.fun user ID
+  username              String   @unique // rip.fun username
+  smartWalletAddress    String?  // smart_wallet_address from API
+  ownerWalletAddress    String?  // owner_wallet_address from API  
+  avatar                String?  // avatar URL
+  banner                String?  // banner URL
+  type                  String?  // user type
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  addresses RipUserAddress[]
+  
+  @@map("rip_users")
+}
+
+model RipUserAddress {
+  id              String   @id @default(cuid())
+  address         String   // blockchain address
+  ripUserId       Int      // foreign key to RipUser
+  discoveredAt    DateTime @default(now()) // when this address was discovered
+  blockNumber     BigInt?  // block number where this was discovered
+  
+  ripUser RipUser @relation(fields: [ripUserId], references: [id], onDelete: Cascade)
+  
+  @@unique([address, ripUserId])
+  @@map("rip_user_addresses")
+}
+
+model SyncStatus {
+  id            String   @id @default(cuid())
+  syncType      String   @unique // "blockchain_users"
+  lastBlockNumber BigInt? // last synced block number
+  lastSyncAt    DateTime @default(now())
+  status        String   @default("pending") // pending, running, completed, error
+  errorMessage  String?  @db.Text
+  
+  @@map("sync_status")
+}
