@@ -1,34 +1,16 @@
 import { json } from '@sveltejs/kit';
 import { tradeAnalyzer } from '$lib/server/services/tradeAnalyzer.js';
+import { extractUserProfile } from '$lib/server/logic/extraction.js';
 import type { RequestHandler } from './$types.js';
 
 // Cache of setId -> Set of standardized card keys (matches TradeAnalyzer key format `card_<id>`)
 const setCardKeyCache: Map<string, Set<string>> = new Map();
 
-async function extractUserProfile(input: string, request: Request) {
+async function getUserProfileForTrade(input: string) {
   console.log(`Extracting profile for: ${input}`);
   
-  // Get the origin from the request to handle both dev and production
-  const origin = new URL(request.url).origin;
-  const extractUrl = `${origin}/api/extract`;
-  
-  // Use the existing extract API endpoint internally
-  const extractResponse = await fetch(extractUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ 
-      username: input,
-      method: 'auto' 
-    })
-  });
-  
-  if (!extractResponse.ok) {
-    throw new Error(`Failed to extract profile for ${input}: ${extractResponse.status}`);
-  }
-  
-  const extractData = await extractResponse.json();
+  // Use the shared extraction logic directly (no HTTP overhead)
+  const extractData = await extractUserProfile(input, { method: 'auto' });
   
   console.log(`Profile extracted for ${extractData.username}: ${extractData.extractedData.profile?.digital_cards?.length || 0} cards`);
   
@@ -52,10 +34,10 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
   
   console.log(`Starting trade analysis between "${userA_input}" and "${userB_input}"`);
   
-  // Extract both user profiles in parallel
+  // Extract both user profiles in parallel using direct function calls
   const [profileA, profileB] = await Promise.all([
-    extractUserProfile(userA_input, request),
-    extractUserProfile(userB_input, request)
+    getUserProfileForTrade(userA_input),
+    getUserProfileForTrade(userB_input)
   ]);
   
   console.log(`Profile extraction complete:`);
