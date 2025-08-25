@@ -59,62 +59,37 @@ export function clearUserCache(userId: string): void {
 }
 
 // Set cache operations (for Pokemon TCG sets)
+// DEPRECATED: Set caching now handled by Redis on backend
 export function saveSetToCache(setId: string, data: any): void {
-  try {
-    const cacheData: CacheData = {
-      data,
-      timestamp: Date.now(),
-      setId
-    };
-    localStorage.setItem(getSetCacheKey(setId), JSON.stringify(cacheData));
-  } catch (err) {
-    console.warn('Failed to save set data to localStorage:', err);
-  }
+  // No-op: Set data caching moved to Redis backend to avoid localStorage quota issues
+  console.log(`Set data caching handled by Redis backend for: ${setId}`);
 }
 
+// DEPRECATED: Set caching now handled by Redis on backend
 export function loadSetFromCache(setId: string): CacheData | null {
-  try {
-    const cached = localStorage.getItem(getSetCacheKey(setId));
-    if (cached) {
-      const cacheData: CacheData = JSON.parse(cached);
-      return cacheData;
-    }
-    return null;
-  } catch (err) {
-    console.warn('Failed to load set data from localStorage:', err);
-    return null;
-  }
+  // No-op: Set data caching moved to Redis backend
+  return null;
 }
 
 // Bulk cache management
+// DEPRECATED: Set caching now handled by Redis on backend
 export function clearAllSetCaches(): void {
-  try {
-    // Get all localStorage keys
-    const keys = Object.keys(localStorage);
-    // Remove all set cache keys
-    keys.forEach(key => {
-      if (key.startsWith('ripexplorer_set_')) {
-        localStorage.removeItem(key);
-      }
-    });
-    console.log('Cleared all set caches');
-  } catch (err) {
-    console.warn('Failed to clear set caches:', err);
-  }
+  // No-op: Set data caching moved to Redis backend
+  console.log('Set cache clearing handled by Redis backend');
 }
 
 export function clearAllCaches(): void {
   try {
-    // Clear all user and set caches
+    // Clear only user caches (not set caches which are in Redis)
     const keys = Object.keys(localStorage);
     keys.forEach(key => {
-      if (key.startsWith('ripexplorer_')) {
+      if (key.startsWith('ripexplorer_cache_')) {
         localStorage.removeItem(key);
       }
     });
-    console.log('Cleared all caches');
+    console.log('Cleared user caches');
   } catch (err) {
-    console.warn('Failed to clear all caches:', err);
+    console.warn('Failed to clear user caches:', err);
   }
 }
 
@@ -133,17 +108,11 @@ export function getCacheStats(): { userCaches: number; setCaches: number; totalS
   try {
     const keys = Object.keys(localStorage);
     let userCaches = 0;
-    let setCaches = 0;
     let totalSize = 0;
     
     keys.forEach(key => {
       if (key.startsWith('ripexplorer_cache_')) {
         userCaches++;
-      } else if (key.startsWith('ripexplorer_set_')) {
-        setCaches++;
-      }
-      
-      if (key.startsWith('ripexplorer_')) {
         const value = localStorage.getItem(key);
         if (value) {
           totalSize += value.length;
@@ -153,7 +122,7 @@ export function getCacheStats(): { userCaches: number; setCaches: number; totalS
     
     return {
       userCaches,
-      setCaches,
+      setCaches: 0, // Set caches are now in Redis, not localStorage
       totalSize: `${Math.round(totalSize / 1024)}KB`
     };
   } catch (err) {

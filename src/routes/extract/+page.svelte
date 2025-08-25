@@ -9,13 +9,16 @@
 
   // Wrapper functions for cache operations with in-memory state management
   function clearAllSetCaches(): void {
-    cacheUtils.clearAllSetCaches();
-    setCardsData = {}; // Clear in-memory set cache too
+    // Only clear in-memory cache since Redis handles persistent caching
+    setCardsData = {};
+    console.log('Cleared in-memory set cache');
   }
 
   function clearAllCaches(): void {
+    // Clear user data from localStorage but not set data (handled by Redis)
     cacheUtils.clearAllCaches();
     setCardsData = {}; // Clear in-memory set cache too
+    console.log('Cleared all caches');
   }
 
   // Resolve set name with cache fallback and ignore numeric-only names like "151"
@@ -242,15 +245,7 @@
       return setCardsData[setId]; // Return cached data if available
     }
 
-    // Check localStorage cache unless force refresh is requested
-    if (!forceRefresh) {
-      const cached = cacheUtils.loadSetFromCache(setId);
-      if (cached) {
-        console.log('Loading set data from cache:', setId);
-        setCardsData[setId] = cached.data;
-        return cached.data;
-      }
-    }
+    // Skip localStorage check - Redis handles caching on backend
 
     loadingSetData[setId] = true;
     setDataErrors[setId] = null;
@@ -269,12 +264,9 @@
         throw new Error(data.details || data.error);
       }
 
-      // Cache the data (already cleaned by backend)
+      // Cache the data in memory only (Redis handles persistent caching)
       setCardsData[setId] = data;
-      
-      // Save to localStorage cache
-      cacheUtils.saveSetToCache(setId, data);
-      console.log('Saved set data to cache:', setId);
+      console.log(`Set data fetched: ${setId} (cached: ${data.cached ? 'yes' : 'no'})`);
       
       return data;
     } catch (err) {
