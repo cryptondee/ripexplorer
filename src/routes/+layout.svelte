@@ -1,6 +1,7 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import '../app.css';
+	import CardModal from '$lib/components/CardModal.svelte';
 
 	let { children } = $props();
 </script>
@@ -28,4 +29,7 @@
 	<main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
 		{@render children?.()}
 	</main>
+	
+	<!-- Global Card Modal -->
+	<CardModal setCardsData={{}} />
 </div>

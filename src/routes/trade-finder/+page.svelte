@@ -4,6 +4,7 @@
   import UserSearchInput from '$lib/components/UserSearchInput.svelte';
   import SetSummaryTable from '$lib/components/trade/SetSummaryTable.svelte';
   import { buildUserSetSummaryFromCounts } from '$lib/utils/trade/summaries';
+  import { openCardModal } from '$lib/stores/modalStore';
   
   let userA = '';
   let userB = '';
@@ -15,6 +16,7 @@
   let selectedSet = 'all';
   let selectedRarity = 'all';
   let selectedTradeType = 'all';
+  let showDuplicatesOnly = false;
   let currentPage = 1;
   let itemsPerPage = 50;
   let filteredTrades: any[] = [];
@@ -28,6 +30,83 @@
   let userSummaryA: any[] = [];
   let userSummaryB: any[] = [];
   let summariesLoading = false;
+  
+  // Computed sorted sets with completion rates
+  $: sortedAvailableSets = [...availableSets].sort((a, b) => {
+    // Get completion rates for User A (first user)
+    const aCompletion = getSetCompletion(a.id, 'A');
+    const bCompletion = getSetCompletion(b.id, 'A');
+    
+    // Sort by least completed to most completed
+    return aCompletion - bCompletion;
+  });
+  
+  function getSetCompletion(setId: string, user: 'A' | 'B'): number {
+    if (!tradeResults) return 0;
+    
+    const owned = user === 'A' ? (tradeResults.ownedBySetA || {})[setId] : (tradeResults.ownedBySetB || {})[setId];
+    const total = setTotals[setId];
+    
+    if (!owned || !total) return 0;
+    return Math.round((owned / total) * 100);
+  }
+
+  // Handle card clicks to show modal
+  function handleCardClick(trade: any) {
+    if (trade && trade.card) {
+      openCardModal(trade.card);
+    }
+  }
+
+  // Calculate filtered trade summary
+  $: filteredTradeSummary = {
+    giveTrades: filteredTrades.filter(trade => trade.tradeType === 'give' || trade.tradeType === 'perfect'),
+    receiveTrades: filteredTrades.filter(trade => {
+      const isReceiveOrPerfect = trade.tradeType === 'receive' || trade.tradeType === 'perfect';
+      if (!isReceiveOrPerfect) return false;
+      
+      if (showDuplicatesOnly) {
+        return trade.userBCount > 1;
+      }
+      
+      return true;
+    }),
+    get giveValue() {
+      return this.giveTrades.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0);
+    },
+    get receiveValue() {
+      return this.receiveTrades.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0);
+    },
+    get giveCardsList() {
+      return this.giveTrades.map(trade => `${trade.card.name} (#${trade.card.card_number}) - $${(trade.estimatedValue || 0).toFixed(2)}`);
+    },
+    get receiveCardsList() {
+      return this.receiveTrades.map(trade => `${trade.card.name} (#${trade.card.card_number}) - $${(trade.estimatedValue || 0).toFixed(2)}`);
+    }
+  };
+
+  // Copy trade summary to clipboard
+  function copyTradeSummary() {
+    const summary = `
+TRADE SUMMARY ${showDuplicatesOnly ? '(Duplicates Only)' : ''}
+Set: ${selectedSet === 'all' ? 'All Sets' : sortedAvailableSets.find(s => s.id === selectedSet)?.name || selectedSet}
+${selectedRarity !== 'all' ? `Rarity: ${selectedRarity}` : ''}
+
+${tradeResults.userA.username} CAN GIVE (${filteredTradeSummary.giveTrades.length} cards - $${filteredTradeSummary.giveValue.toFixed(2)}):
+${filteredTradeSummary.giveCardsList.join('\n')}
+
+${tradeResults.userA.username} CAN RECEIVE (${filteredTradeSummary.receiveTrades.length} cards - $${filteredTradeSummary.receiveValue.toFixed(2)}):
+${filteredTradeSummary.receiveCardsList.join('\n')}
+
+TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveValue ? '+' : ''}$${(filteredTradeSummary.receiveValue - filteredTradeSummary.giveValue).toFixed(2)} (${tradeResults.userA.username} perspective)
+    `.trim();
+
+    navigator.clipboard.writeText(summary).then(() => {
+      // Could add toast notification here
+      console.log('Trade summary copied to clipboard');
+      alert('Trade summary copied to clipboard!');
+    });
+  }
 
   function getSetName(id: string): string {
     // Special-case mapping consistent with extract page
@@ -144,8 +223,30 @@
         });
         
         availableRarities = Array.from(raritySet).sort();
+        
+        // Populate setTotals from availableSets
+        availableSets.forEach(set => {
+          setTotals[set.id] = set.totalCards || 0;
+        });
+        
+        // Set default selection: prefer "151" (sv3pt5) if available, otherwise first set
+        const preferredSet = availableSets.find(set => set.id === 'sv3pt5' || set.name?.includes('151'));
+        if (preferredSet) {
+          selectedSet = preferredSet.id;
+        } else if (availableSets.length > 0) {
+          // Will use sortedAvailableSets[0] after reactive statement updates
+          selectedSet = availableSets[0].id;
+        }
+        
         console.log('Trade comparison results:', data);
         console.log('Available rarities:', availableRarities);
+        console.log('Default selected set:', selectedSet);
+        
+        // Wait for reactive statement to update sortedAvailableSets, then set proper default
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (!preferredSet && availableSets.length > 0) {
+          selectedSet = sortedAvailableSets[0]?.id || availableSets[0].id;
+        }
         
         // Load filtered trades for the first time
         await loadFilteredTrades();
@@ -274,16 +375,16 @@
         <!-- User A Input -->
         <UserSearchInput
           bind:value={userA}
-          label="First User (Username or ID)"
-          placeholder="Enter username..."
+          label="First User (Name or ID)"
+          placeholder="Enter user..."
           on:change={() => {}}
         />
 
         <!-- User B Input -->
         <UserSearchInput
           bind:value={userB}
-          label="Second User (Username or ID)"
-          placeholder="Enter username..."
+          label="Second User (Name or ID)"
+          placeholder="Enter user..."
           on:change={() => {}}
         />
       </div>
@@ -423,10 +524,10 @@
                   on:change={handleSetChange}
                   class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="all">All Sets</option>
-                  {#each availableSets as set}
-                    <option value={set.id}>{set.name} ({set.count})</option>
+                  {#each sortedAvailableSets as set}
+                    <option value={set.id}>{set.name} - {getSetCompletion(set.id, 'A')}% complete ({set.count})</option>
                   {/each}
+                  <option value="all">All Sets</option>
                 </select>
               </div>
 
@@ -446,6 +547,19 @@
                 </select>
               </div>
 
+              <!-- Show Duplicates Only -->
+              <div class="flex items-center space-x-2">
+                <label class="flex items-center text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    bind:checked={showDuplicatesOnly}
+                    on:change={handleSetChange}
+                    class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  Show Duplicates Only
+                </label>
+              </div>
+
               <!-- Clear Filters -->
               <button
                 type="button"
@@ -453,6 +567,7 @@
                   selectedSet = 'all';
                   selectedRarity = 'all';
                   selectedTradeType = 'all';
+                  showDuplicatesOnly = false;
                   handleSetChange();
                 }}
                 class="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
@@ -461,6 +576,49 @@
               </button>
             </div>
           </div>
+
+          <!-- Filtered Trade Summary -->
+          {#if filteredTradeSummary.giveTrades.length > 0 || filteredTradeSummary.receiveTrades.length > 0}
+            <div class="bg-white rounded-lg shadow-md p-8 mb-8">
+              <div class="flex justify-between items-start mb-4">
+                <h2 class="text-xl font-bold text-gray-900">
+                  💼 Current Filter Summary {showDuplicatesOnly ? '(Duplicates Only)' : ''}
+                </h2>
+                <button
+                  type="button"
+                  on:click={copyTradeSummary}
+                  class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  📋 Copy Summary
+                </button>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Give Summary -->
+                <div class="text-center p-6 bg-orange-50 rounded-lg border-2 border-orange-200">
+                  <p class="text-2xl font-bold text-orange-600">${filteredTradeSummary.giveValue.toFixed(2)}</p>
+                  <p class="text-sm text-orange-700">{filteredTradeSummary.giveTrades.length} Cards to Give</p>
+                </div>
+                
+                <!-- Receive Summary -->
+                <div class="text-center p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
+                  <p class="text-2xl font-bold text-blue-600">${filteredTradeSummary.receiveValue.toFixed(2)}</p>
+                  <p class="text-sm text-blue-700">{filteredTradeSummary.receiveTrades.length} Cards to Receive</p>
+                </div>
+                
+                <!-- Balance -->
+                {#if true}
+                  {@const balanceDiff = filteredTradeSummary.receiveValue - filteredTradeSummary.giveValue}
+                  <div class="text-center p-6 rounded-lg border-2 {balanceDiff > 0 ? 'bg-green-50 border-green-200' : balanceDiff < 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}">
+                    <p class="text-2xl font-bold {balanceDiff > 0 ? 'text-green-600' : balanceDiff < 0 ? 'text-red-600' : 'text-gray-600'}">
+                      {balanceDiff > 0 ? '+' : ''}${balanceDiff.toFixed(2)}
+                    </p>
+                    <p class="text-sm {balanceDiff > 0 ? 'text-green-700' : balanceDiff < 0 ? 'text-red-700' : 'text-gray-700'}">Trade Balance</p>
+                  </div>
+                {/if}
+              </div>
+            </div>
+          {/if}
 
           <!-- Two Tables Side by Side -->
           <div class="grid grid-cols-1 xl:grid-cols-2 gap-12">
@@ -472,16 +630,30 @@
                   trades={giveTrades}
                   userCountField="userACount"
                   titleColor="text-orange-600"
+                  on:cardClick={(e) => handleCardClick(e.detail)}
                 />
               {/if}
 
-              {@const receiveTrades = filteredTrades.filter(trade => trade.tradeType === 'receive' || trade.tradeType === 'perfect')}
+              {@const receiveTrades = filteredTrades.filter(trade => {
+                const isReceiveOrPerfect = trade.tradeType === 'receive' || trade.tradeType === 'perfect';
+                if (!isReceiveOrPerfect) return false;
+                
+                // Apply duplicates filter only to receive trades
+                if (showDuplicatesOnly) {
+                  // Show only cards where User B has duplicates to give (userBCount > 1)
+                  // This means User B can give without lowering their completion rate
+                  return trade.userBCount > 1;
+                }
+                
+                return true;
+              })}
               {#if receiveTrades.length > 0}
                 <TradeTable
-                  title="⬅️ {tradeResults.userA.username} Can Receive"
+                  title="⬅️ {tradeResults.userA.username} Can Receive {showDuplicatesOnly ? '(Duplicates Only)' : ''}"
                   trades={receiveTrades}
                   userCountField="userBCount"
                   titleColor="text-blue-600"
+                  on:cardClick={(e) => handleCardClick(e.detail)}
                 />
               {/if}
 

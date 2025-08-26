@@ -4,7 +4,7 @@
   // Props
   export let value: string = '';
   export let label: string = '';
-  export let placeholder: string = 'Enter username...';
+  export let placeholder: string = 'Enter user...';
   export let disabled: boolean = false;
 
   // Internal state
@@ -71,17 +71,25 @@
 </script>
 
 <div class="user-search-container search-container relative">
+  <!-- Hidden dummy input to prevent password manager activation -->
+  <input type="text" style="position: absolute; left: -9999px;" tabindex="-1" aria-hidden="true" />
+  
   <label for={label.replace(/\s+/g, '').toLowerCase()} class="block text-sm font-medium text-gray-700 mb-2">
     {label}
   </label>
   <input
-    type="text"
+    type="search"
     id={label.replace(/\s+/g, '').toLowerCase()}
     bind:value
     on:input={handleInput}
     {placeholder}
     {disabled}
     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent {disabled ? 'bg-gray-100 cursor-not-allowed' : ''}"
+    autocomplete="off"
+    aria-label="Search for rip.fun user"
+    data-lpignore="true"
+    data-1p-ignore="true"
+    data-form-type="other"
   />
   
   {#if loading}

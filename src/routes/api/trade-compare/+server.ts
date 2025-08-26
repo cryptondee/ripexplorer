@@ -203,7 +203,10 @@ export const GET: RequestHandler = async ({ url, request }) => {
     const limit = parseInt(url.searchParams.get('limit') || '50');
     
     // Use the shared analysis function
-    let { tradeAnalysis } = await getTradeAnalysisForUsers(userA!, userB!, request);
+    let { tradeAnalysis, collectionA, collectionB } = await getTradeAnalysisForUsers(userA!, userB!, request);
+    
+    // Get available sets (needed for frontend)
+    const availableSets = tradeAnalyzer.getAvailableSets(collectionA, collectionB);
     
     // Filter by set if specified
     if (setId && setId !== 'all') {
@@ -226,6 +229,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
     return json({
       success: true,
       trades: paginatedTrades,
+      availableSets,
       pagination: {
         currentPage: page,
         totalPages,

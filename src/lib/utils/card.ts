@@ -4,9 +4,14 @@ export function getSetNameFromCard(input: any, setCardsData?: any): string {
   const numericOnly = (s: any) => typeof s === 'string' && /^\d+$/.test(s.trim());
   const setId = card?.set?.id || card?.card?.set_id || card?.set_id;
   
-  // Known mappings for sets where name is provided as a numeric code
+  // Extended known mappings for sets
   const knownSetNames: Record<string, string> = {
-    sv3pt5: 'Scarlet & Violet 151'
+    'sv3pt5': '151',
+    'sv8pt5': 'Surging Sparks', 
+    'zsv10pt5': 'Stellar Crown',
+    'rsv10pt5': 'Stellar Crown',
+    'sv4': 'Paradox Rift',
+    'sv5': 'Temporal Forces'
   };
   if (setId && knownSetNames[setId]) return knownSetNames[setId];
 
@@ -20,7 +25,7 @@ export function getSetNameFromCard(input: any, setCardsData?: any): string {
   const cachedName = setId && setCardsData && (setCardsData[setId]?.set?.name || setCardsData[setId]?.cards?.[0]?.set?.name);
   if (cachedName && !numericOnly(cachedName)) return cachedName;
 
-  // Fall back to top-level digital card set.name if non-numeric
+  // Fall back to top-level digital card set.name if non-numeric  
   const topLevelName = card?.set?.name;
   if (topLevelName && !numericOnly(topLevelName)) return topLevelName;
 

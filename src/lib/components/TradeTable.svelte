@@ -1,9 +1,20 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte';
+  
   // Props for the reusable trade table component
   export let title: string;
   export let trades: any[];
   export let userCountField: 'userACount' | 'userBCount';
   export let titleColor: string = 'text-gray-900';
+  
+  // Event dispatcher
+  const dispatch = createEventDispatcher<{
+    cardClick: any;
+  }>();
+  
+  function handleCardClick(trade: any) {
+    dispatch('cardClick', trade);
+  }
 
   function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('en-US', {
@@ -64,7 +75,11 @@
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
         {#each trades as trade}
-          <tr class="{getRowHighlighting(trade)}" style="{getRowStyle(trade)}">
+          <tr 
+            class="{getRowHighlighting(trade)}" 
+            style="{getRowStyle(trade)}"
+            on:click={() => handleCardClick(trade)}
+          >
             <!-- Card -->
             <td class="px-4 py-3 whitespace-nowrap">
               <div class="flex items-center">
