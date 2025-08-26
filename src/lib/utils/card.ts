@@ -22,6 +22,7 @@ export function getSetNameFromCard(input: any, setCardsData?: any): string {
     'sv5': 'Temporal Forces',
     'sv4pt5': 'Paldean fates',
     'sv4': 'Paradox rift set',
+    'swsh5':'Crown Zenith'
   };
   if (setId && knownSetNames[setId]) return knownSetNames[setId];
 

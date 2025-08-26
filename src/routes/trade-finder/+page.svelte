@@ -62,10 +62,29 @@
 
   // Handle card clicks to show modal
   function handleCardClick(trade: any) {
-    if (trade && trade.card) {
-      // For trade finder, we don't have access to all user cards for duplicates,
-      // so just show the single card
-      openCardModal(trade.card, []);
+    if (trade && trade.card && tradeResults) {
+      // Determine which user's collection to use for duplicates
+      // If both users have the card, prefer showing User A's collection
+      let allCards = [];
+      
+      if (trade.userAHas && trade.userBHas) {
+        // Both have it - show User A's duplicates by default
+        allCards = tradeResults.userA?.allCards || [];
+      } else if (trade.userAHas) {
+        // Only User A has this card
+        allCards = tradeResults.userA?.allCards || [];
+      } else if (trade.userBHas) {
+        // Only User B has this card
+        allCards = tradeResults.userB?.allCards || [];
+      }
+      
+      // Pass complete collection for duplicate detection
+      console.log('Opening modal with cards:', {
+        tradeCard: trade.card,
+        allCardsLength: allCards.length,
+        sampleCard: allCards[0]
+      });
+      openCardModal(trade.card, allCards);
     }
   }
   
@@ -301,6 +320,12 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
 
       if (response.ok && data.success) {
         tradeResults = data;
+        console.log('Trade results received:', {
+          userA_allCards: data.userA?.allCards?.length || 0,
+          userB_allCards: data.userB?.allCards?.length || 0,
+          userA_sample: data.userA?.allCards?.[0],
+          userB_sample: data.userB?.allCards?.[0]
+        });
         availableSets = data.availableSets || [];
         
         // Show cache status if data was cached

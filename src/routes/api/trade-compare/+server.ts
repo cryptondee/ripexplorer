@@ -171,7 +171,9 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
     ownedBySetA,
     ownedBySetB,
     missingBySetA,
-    missingBySetB
+    missingBySetB,
+    rawCardsA: profileA.cards,
+    rawCardsB: profileB.cards
   };
 }
 
@@ -191,7 +193,7 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     
     // Use the shared analysis function
-    const { tradeAnalysis, collectionA, collectionB, ownedBySetA, ownedBySetB, missingBySetA, missingBySetB } = await getTradeAnalysisForUsers(userA, userB, request, forceRefresh);
+    const { tradeAnalysis, collectionA, collectionB, ownedBySetA, ownedBySetB, missingBySetA, missingBySetB, rawCardsA, rawCardsB } = await getTradeAnalysisForUsers(userA, userB, request, forceRefresh);
     
     // Get available sets for filtering
     const availableSets = tradeAnalyzer.getAvailableSets(collectionA, collectionB);
@@ -207,13 +209,15 @@ export const POST: RequestHandler = async ({ request }) => {
         username: collectionA.username,
         id: collectionA.id,
         totalCards: collectionA.ownedCards.size,
-        profile: collectionA.profile
+        profile: collectionA.profile,
+        allCards: rawCardsA
       },
       userB: {
         username: collectionB.username,
         id: collectionB.id,
         totalCards: collectionB.ownedCards.size,
-        profile: collectionB.profile
+        profile: collectionB.profile,
+        allCards: rawCardsB
       },
       tradeAnalysis,
       ownedBySetA,

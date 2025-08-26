@@ -15,12 +15,35 @@ export const selectedCardIndex = writable(0);
 // ==========================================
 
 export function openCardModal(card: any, allCards: any[] = []) {
+  // Handle both flat (trade-finder) and nested (extract) structures
+  const getCardId = (c: any) => {
+    // Try nested structure first (extract page)
+    if (c.card?.id) return c.card.id;
+    // Then try flat structure (trade-finder)
+    if (c.id) return c.id;
+    // Fallback to name
+    return c.card?.name || c.name || '';
+  };
+  
+  const getCardNumber = (c: any) => {
+    return c.card?.card_number || c.card_number || '';
+  };
+  
   // Find all duplicate cards (same card ID and card number)
-  const cardKey = `${card.card?.id || card.card?.name}_${card.card?.card_number}`;
+  const cardId = getCardId(card);
+  const cardNumber = getCardNumber(card);
+  const cardKey = `${cardId}_${cardNumber}`;
+  
+  console.log('Modal: Looking for duplicates with key:', cardKey);
+  
   const duplicates = allCards.filter(c => {
-    const cKey = `${c.card?.id || c.card?.name}_${c.card?.card_number}`;
+    const cId = getCardId(c);
+    const cNum = getCardNumber(c);
+    const cKey = `${cId}_${cNum}`;
     return cKey === cardKey;
   });
+  
+  console.log('Modal: Found duplicates:', duplicates.length);
   
   // If we found duplicates, use them, otherwise just the single card
   const cardsToShow = duplicates.length > 1 ? duplicates : [card];

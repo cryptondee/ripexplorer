@@ -10,6 +10,52 @@
 import { extractFromRipFunAPI } from '../services/parser.js';
 import { userSyncService } from '../services/userSync.js';
 
+/**
+ * Resolve username to user ID by fetching the rip.fun profile page
+ * and extracting the user ID from the page data
+ */
+async function resolveUsernameFromProfilePage(username: string): Promise<number | null> {
+  try {
+    const profileUrl = `https://www.rip.fun/profile/${username}`;
+    console.log(`Attempting to resolve username '${username}' via profile page: ${profileUrl}`);
+    
+    const response = await fetch(profileUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log(`Profile not found for username: ${username}`);
+        return null;
+      }
+      throw new Error(`Profile page returned ${response.status}`);
+    }
+    
+    const html = await response.text();
+    
+    // Look for user ID in the page data - check for common patterns
+    // rip.fun often includes user data in script tags or data attributes
+    const userIdMatch = html.match(/"user_id":\s*(\d+)/i) || 
+                       html.match(/"id":\s*(\d+)/i) ||
+                       html.match(/user[_-]?id["']?:\s*["']?(\d+)/i);
+    
+    if (userIdMatch) {
+      const userId = parseInt(userIdMatch[1]);
+      console.log(`Extracted user ID ${userId} from profile page for ${username}`);
+      return userId;
+    }
+    
+    console.log(`Could not find user ID in profile page for username: ${username}`);
+    return null;
+    
+  } catch (error) {
+    console.error(`Failed to resolve username '${username}' from profile page:`, error);
+    return null;
+  }
+}
+
 export interface ExtractionOptions {
   forceRefresh?: boolean;
 }
@@ -63,8 +109,20 @@ export async function extractUserProfile(
         resolutionMethod = 'database';
         console.log(`Username resolved: ${trimmedInput} -> ID: ${resolvedUserId}`);
       } else {
-        console.log(`Username not found in database: ${trimmedInput}, using as direct username`);
-        // Will use input directly as rip.fun username
+        console.log(`Username not found in database: ${trimmedInput}, attempting profile page lookup`);
+        // Try to resolve username by fetching profile page
+        try {
+          const profilePageId = await resolveUsernameFromProfilePage(trimmedInput);
+          if (profilePageId) {
+            resolvedUserId = profilePageId;
+            resolutionMethod = 'profile_page';
+            console.log(`Username resolved via profile page: ${trimmedInput} -> ID: ${resolvedUserId}`);
+          } else {
+            console.log(`Username '${trimmedInput}' not found via profile page either`);
+          }
+        } catch (profileError) {
+          console.warn(`Profile page resolution failed for ${trimmedInput}:`, profileError);
+        }
       }
     } catch (error) {
       console.warn(`Username resolution failed for ${trimmedInput}:`, error);
@@ -85,8 +143,11 @@ export async function extractUserProfile(
   // Use API extraction (only method now)
   try {
     console.log(`Attempting API extraction for user: ${resolvedUsername} (ID: ${resolvedUserId || 'unknown'})`);
-    // Use resolvedUserId if available, otherwise fall back to resolvedUsername (for numeric inputs)
-    const extractionTarget = resolvedUserId ? resolvedUserId.toString() : resolvedUsername;
+    // API requires numeric user ID only
+    if (!resolvedUserId) {
+      throw new Error(`Could not resolve username '${resolvedUsername}' to user ID. The user may not exist or may not be in our database yet.`);
+    }
+    const extractionTarget = resolvedUserId.toString();
     extractedData = await extractFromRipFunAPI(extractionTarget);
     apiCallsMade = extractedData.api_calls_made || 0;
     

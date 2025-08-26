@@ -18,7 +18,7 @@
       const setIds = [...new Set(
         extractedData.profile.digital_cards
           .map((card: any) => card.card?.set_id)
-          .filter((id: string) => id)
+          .filter((id: any): id is string => !!id)
       )];
       
       try {
