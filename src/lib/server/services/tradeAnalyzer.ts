@@ -10,6 +10,13 @@ export interface TradeCard {
   type?: string;
   hp?: number;
   set_name?: string;
+  // Foil type information
+  is_reverse?: boolean;
+  is_holo?: boolean;
+  is_first_edition?: boolean;
+  is_shadowless?: boolean;
+  is_unlimited?: boolean;
+  is_promo?: boolean;
 }
 
 export interface UserCardCollection {
@@ -103,7 +110,14 @@ export class TradeAnalyzer {
         small_image_url: cardInfo.small_image_url || cardInfo.image_url || card.front_image_url || card.image_url,
         type: cardInfo.type || card.type,
         hp: cardInfo.hp || card.hp,
-        set_name: setInfo.name || cardInfo.set_name || card.set_name
+        set_name: setInfo.name || cardInfo.set_name || card.set_name,
+        // Foil type information - handle nested structure
+        is_reverse: cardInfo.is_reverse || card.is_reverse,
+        is_holo: cardInfo.is_holo || card.is_holo,
+        is_first_edition: cardInfo.is_first_edition || card.is_first_edition,
+        is_shadowless: cardInfo.is_shadowless || card.is_shadowless,
+        is_unlimited: cardInfo.is_unlimited || card.is_unlimited,
+        is_promo: cardInfo.is_promo || card.is_promo
       };
       
       cardMap.set(key, standardCard);

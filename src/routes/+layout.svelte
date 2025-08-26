@@ -31,5 +31,5 @@
 	</main>
 	
 	<!-- Global Card Modal -->
-	<CardModal setCardsData={{}} />
+	<CardModal />
 </div>

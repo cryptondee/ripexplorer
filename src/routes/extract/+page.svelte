@@ -163,7 +163,8 @@
   
   // Handle card click to show modal
   // Card modal functions now use store-based state management
-  function openCardModalHandler(card: any, allCardsOfSameType: any[] = []) {
+  // Simplified modal handler - matches trade-finder pattern
+  function handleCardClick(card: any) {
     openCardModal(card);
   }
   
@@ -763,7 +764,7 @@
                     selectedSet={$selectedSet}
                     cardsBySet={cardsBySet}
                     paginatedCards={paginatedCards}
-                    on:cardClick={(e) => openCardModalHandler(e.detail)}
+                    on:cardClick={(e) => handleCardClick(e.detail)}
                   />
                 {:else}
                   <CardTable
@@ -772,7 +773,7 @@
                     sortDirection={$sortDirection}
                     setNameById={{}}
                     resolveSetName={(card) => getSetNameFromCard(card, $setCardsData)}
-                    on:cardClick={(e) => openCardModalHandler(e.detail)}
+                    on:cardClick={(e) => handleCardClick(e.detail)}
                     on:sort={(e) => handleSort(e.detail.column)}
                   />
                 {/if}

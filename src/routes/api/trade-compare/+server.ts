@@ -213,16 +213,16 @@ export const GET: RequestHandler = async ({ url, request }) => {
       tradeAnalysis = tradeAnalyzer.filterBySet(tradeAnalysis, setId);
     }
     
-    // Paginate results
+    // Return all trades without pagination to avoid hiding trade types
+    // Frontend handles filtering by trade type, so we need all types available
     const allTrades = [
       ...tradeAnalysis.perfectTrades,
       ...tradeAnalysis.userACanReceive,
       ...tradeAnalysis.userACanGive
     ];
     
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedTrades = allTrades.slice(startIndex, endIndex);
+    // Don't paginate here - let frontend handle the full dataset for proper filtering
+    const paginatedTrades = allTrades;
     
     const totalPages = Math.ceil(allTrades.length / limit);
     
@@ -235,7 +235,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
         totalPages,
         totalItems: allTrades.length,
         itemsPerPage: limit,
-        hasMore: endIndex < allTrades.length
+        hasMore: false  // No pagination, return all
       },
       summary: tradeAnalysis.summary,
       setFilter: setId || 'all'

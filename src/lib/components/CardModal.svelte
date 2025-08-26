@@ -3,11 +3,78 @@
   import { isCardModalOpen, selectedCard, closeCardModal } from '$lib/stores/modalStore';
   import { getSetNameFromCard } from '$lib/utils/card';
   
-  // Get set cards data from card collection store
-  import { writable } from 'svelte/store';
+  // Modal is now fully self-contained and doesn't need external props
+  // Set name resolution will fall back to set ID if no external data available
   
-  // For now, we'll accept this as a prop until fully integrated
-  let { setCardsData = {} }: { setCardsData?: any } = $props();
+  // Helper function to get card data from either format
+  $: cardData = $selectedCard ? extractCardData($selectedCard) : null;
+  
+  function extractCardData(rawCard: any) {
+    // Handle different card data structures:
+    // 1. Extract page format: { card: { name, large_image_url, ... } }
+    // 2. Trade-finder format: { name, image_url, small_image_url, ... }
+    
+    const hasNestedCard = rawCard.card && typeof rawCard.card === 'object';
+    const card = hasNestedCard ? rawCard.card : rawCard;
+    
+    return {
+      // Basic card info
+      name: card?.name || 'Unknown Card',
+      card_number: card?.card_number || card?.formatted_card_number,
+      rarity: card?.rarity,
+      
+      // Images - handle different field names
+      large_image_url: card?.large_image_url || card?.image_url || card?.small_image_url,
+      small_image_url: card?.small_image_url || card?.image_url,
+      
+      // Set information  
+      set_id: card?.set_id || card?.set?.id,
+      set_name: card?.set_name || card?.set?.name,
+      
+      // Card details
+      hp: card?.hp,
+      types: card?.types,
+      supertype: card?.supertype,
+      subtype: card?.subtype,
+      illustrator: card?.illustrator,
+      
+      // Market info
+      raw_price: card?.raw_price || card?.market_value,
+      
+      // Special features
+      is_reverse: card?.is_reverse,
+      is_holo: card?.is_holo,
+      is_first_edition: card?.is_first_edition,
+      is_shadowless: card?.is_shadowless,
+      is_unlimited: card?.is_unlimited,
+      is_promo: card?.is_promo,
+      
+      // Full card object for getSetNameFromCard utility
+      _fullCard: rawCard
+    };
+  }
+  
+  // Helper function to determine foil type like in extract page
+  function getFoilType(card: any) {
+    if (card?.is_reverse) {
+      return 'Reverse Holo';
+    } else if (card?.is_holo) {
+      return 'Holo';
+    } else {
+      return 'Normal';
+    }
+  }
+  
+  // Helper function to get foil icon
+  function getFoilIcon(card: any) {
+    if (card?.is_reverse) {
+      return '🔄';
+    } else if (card?.is_holo) {
+      return '✨';
+    } else {
+      return '⚪';
+    }
+  }
 </script>
 
 {#if $isCardModalOpen && $selectedCard}
@@ -16,9 +83,9 @@
       <!-- Modal Header -->
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold text-gray-900">
-          {$selectedCard.card?.name || 'Unknown Card'}
-          {#if $selectedCard.card?.card_number}
-            <span class="text-gray-500">#{$selectedCard.card.card_number}</span>
+          {cardData?.name || 'Unknown Card'}
+          {#if cardData?.card_number}
+            <span class="text-gray-500">#{cardData.card_number}</span>
           {/if}
         </h3>
         <button onclick={closeCardModal} class="text-gray-400 hover:text-gray-600" aria-label="Close modal">
@@ -31,16 +98,16 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Card Image -->
         <div class="flex flex-col items-center">
-          {#if $selectedCard.card?.large_image_url}
+          {#if cardData?.large_image_url}
             <div class="relative group">
               <button 
                 class="max-w-full h-auto rounded-lg shadow-md hover:shadow-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                onclick={() => window.open($selectedCard.card.large_image_url, '_blank')}
+                onclick={() => window.open(cardData.large_image_url, '_blank')}
                 aria-label="Open full-size image in new tab"
               >
                 <img 
-                  src={$selectedCard.card.large_image_url} 
-                  alt={$selectedCard.card?.name} 
+                  src={cardData.large_image_url} 
+                  alt={cardData?.name} 
                   class="max-w-full h-auto rounded-lg"
                 />
                 <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all flex items-center justify-center">
@@ -50,16 +117,16 @@
                 </div>
               </button>
             </div>
-          {:else if $selectedCard.card?.small_image_url}
+          {:else if cardData?.small_image_url}
             <div class="relative group">
               <button 
                 class="max-w-full h-auto rounded-lg shadow-md hover:shadow-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                onclick={() => window.open($selectedCard.card.small_image_url, '_blank')}
+                onclick={() => window.open(cardData.small_image_url, '_blank')}
                 aria-label="Open image in new tab"
               >
                 <img 
-                  src={$selectedCard.card.small_image_url} 
-                  alt={$selectedCard.card?.name} 
+                  src={cardData.small_image_url} 
+                  alt={cardData?.name} 
                   class="max-w-full h-auto rounded-lg"
                 />
                 <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all flex items-center justify-center">
@@ -75,7 +142,7 @@
             </div>
           {/if}
           <p class="text-xs text-gray-500 mt-2 text-center">
-            {$selectedCard.card?.large_image_url ? 'High resolution image' : 'Standard resolution image'}
+            {cardData?.large_image_url ? 'High resolution image' : 'Standard resolution image'}
           </p>
         </div>
         
@@ -87,74 +154,83 @@
             <dl class="space-y-2 text-sm">
               <div class="flex justify-between">
                 <dt class="text-gray-500">Set:</dt>
-                <dd class="text-gray-900">{getSetNameFromCard($selectedCard, setCardsData)}</dd>
+                <dd class="text-gray-900">{getSetNameFromCard(cardData?._fullCard)}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Rarity:</dt>
                 <dd class="text-gray-900">
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                    {$selectedCard.card?.rarity || 'Unknown'}
+                    {cardData?.rarity || 'Unknown'}
                   </span>
                 </dd>
               </div>
-              {#if $selectedCard.card?.types?.length}
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Foil:</dt>
+                <dd class="text-gray-900">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {getFoilType(cardData) === 'Normal' ? 'bg-gray-100 text-gray-800' : getFoilType(cardData) === 'Reverse Holo' ? 'bg-purple-100 text-purple-800' : 'bg-yellow-100 text-yellow-800'}">
+                    <span class="mr-1">{getFoilIcon(cardData)}</span>
+                    {getFoilType(cardData)}
+                  </span>
+                </dd>
+              </div>
+              {#if cardData?.types?.length}
                 <div class="flex justify-between">
                   <dt class="text-gray-500">Type:</dt>
-                  <dd class="text-gray-900">{$selectedCard.card.types.join(', ')}</dd>
+                  <dd class="text-gray-900">{cardData.types.join(', ')}</dd>
                 </div>
               {/if}
-              {#if $selectedCard.card?.hp}
+              {#if cardData?.hp}
                 <div class="flex justify-between">
                   <dt class="text-gray-500">HP:</dt>
-                  <dd class="text-gray-900">{$selectedCard.card.hp}</dd>
+                  <dd class="text-gray-900">{cardData.hp}</dd>
                 </div>
               {/if}
-              {#if $selectedCard.card?.supertype}
+              {#if cardData?.supertype}
                 <div class="flex justify-between">
                   <dt class="text-gray-500">Supertype:</dt>
-                  <dd class="text-gray-900">{$selectedCard.card.supertype}</dd>
+                  <dd class="text-gray-900">{cardData.supertype}</dd>
                 </div>
               {/if}
-              {#if $selectedCard.card?.subtype?.length}
+              {#if cardData?.subtype?.length}
                 <div class="flex justify-between">
                   <dt class="text-gray-500">Subtype:</dt>
-                  <dd class="text-gray-900">{$selectedCard.card.subtype.join(', ')}</dd>
+                  <dd class="text-gray-900">{cardData.subtype.join(', ')}</dd>
                 </div>
               {/if}
             </dl>
           </div>
           
           <!-- Card Features -->
-          {#if $selectedCard.card?.is_reverse || $selectedCard.card?.is_holo || $selectedCard.card?.is_first_edition || $selectedCard.card?.is_shadowless || $selectedCard.card?.is_unlimited || $selectedCard.card?.is_promo}
+          {#if cardData?.is_reverse || cardData?.is_holo || cardData?.is_first_edition || cardData?.is_shadowless || cardData?.is_unlimited || cardData?.is_promo}
             <div class="bg-purple-50 p-4 rounded-lg">
               <h4 class="font-semibold text-gray-900 mb-3">Special Features</h4>
               <div class="flex flex-wrap gap-2">
-                {#if $selectedCard.card?.is_reverse}
+                {#if cardData?.is_reverse}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                     🔄 Reverse Holo
                   </span>
                 {/if}
-                {#if $selectedCard.card?.is_holo}
+                {#if cardData?.is_holo}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rainbow-100 text-rainbow-800 bg-gradient-to-r from-pink-100 to-blue-100">
                     ✨ Holographic
                   </span>
                 {/if}
-                {#if $selectedCard.card?.is_first_edition}
+                {#if cardData?.is_first_edition}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                     🥇 First Edition
                   </span>
                 {/if}
-                {#if $selectedCard.card?.is_shadowless}
+                {#if cardData?.is_shadowless}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                     👤 Shadowless
                   </span>
                 {/if}
-                {#if $selectedCard.card?.is_unlimited}
+                {#if cardData?.is_unlimited}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     ♾️ Unlimited
                   </span>
                 {/if}
-                {#if $selectedCard.card?.is_promo}
+                {#if cardData?.is_promo}
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                     🎁 Promo
                   </span>
@@ -181,10 +257,10 @@
                   <dd class="text-green-600 font-semibold">${$selectedCard.listing.usd_price}</dd>
                 </div>
               {/if}
-              {#if $selectedCard.card?.raw_price}
+              {#if cardData?.raw_price}
                 <div class="flex justify-between">
                   <dt class="text-gray-500">Market Value:</dt>
-                  <dd class="text-gray-900">${$selectedCard.card.raw_price}</dd>
+                  <dd class="text-gray-900">${cardData.raw_price}</dd>
                 </div>
               {/if}
             </dl>
@@ -196,7 +272,7 @@
             <dl class="space-y-2 text-sm">
               <div class="flex justify-between">
                 <dt class="text-gray-500">Card ID:</dt>
-                <dd class="text-gray-900 font-mono">{$selectedCard.card?.id || $selectedCard.id}</dd>
+                <dd class="text-gray-900 font-mono">{cardData?.id || $selectedCard.id}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Token ID:</dt>

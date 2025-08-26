@@ -60,7 +60,17 @@
 
   // Calculate filtered trade summary
   $: filteredTradeSummary = {
-    giveTrades: filteredTrades.filter(trade => trade.tradeType === 'give' || trade.tradeType === 'perfect'),
+    giveTrades: filteredTrades.filter(trade => {
+      const isGiveOrPerfect = trade.tradeType === 'give' || trade.tradeType === 'perfect';
+      if (!isGiveOrPerfect) return false;
+      
+      // Apply duplicates filter to give trades in summary
+      if (showDuplicatesOnly) {
+        return trade.userACount > 1;
+      }
+      
+      return true;
+    }),
     receiveTrades: filteredTrades.filter(trade => {
       const isReceiveOrPerfect = trade.tradeType === 'receive' || trade.tradeType === 'perfect';
       if (!isReceiveOrPerfect) return false;
@@ -78,10 +88,10 @@
       return this.receiveTrades.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0);
     },
     get giveCardsList() {
-      return this.giveTrades.map(trade => `${trade.card.name} (#${trade.card.card_number}) - $${(trade.estimatedValue || 0).toFixed(2)}`);
+      return this.giveTrades.map(trade => `${trade.card.name} (#${trade.card.card_number}) [${getFoilTypeWithIcon(trade.card)}] - $${(trade.estimatedValue || 0).toFixed(2)}`);
     },
     get receiveCardsList() {
-      return this.receiveTrades.map(trade => `${trade.card.name} (#${trade.card.card_number}) - $${(trade.estimatedValue || 0).toFixed(2)}`);
+      return this.receiveTrades.map(trade => `${trade.card.name} (#${trade.card.card_number}) [${getFoilTypeWithIcon(trade.card)}] - $${(trade.estimatedValue || 0).toFixed(2)}`);
     }
   };
 
@@ -112,6 +122,17 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
     // Special-case mapping consistent with extract page
     if (id === 'sv3pt5') return 'Scarlet & Violet 151';
     return setNameById[id] || id || 'Unknown Set';
+  }
+
+  // Helper function to get foil type with icon for trade summary
+  function getFoilTypeWithIcon(card: any): string {
+    if (card?.is_reverse) {
+      return '🔄 Reverse Holo';
+    } else if (card?.is_holo) {
+      return '✨ Holo';
+    } else {
+      return '⚪ Normal';
+    }
   }
 
   async function getSetTotal(id: string): Promise<number> {
@@ -623,10 +644,24 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
           <!-- Two Tables Side by Side -->
           <div class="grid grid-cols-1 xl:grid-cols-2 gap-12">
             {#if filteredTrades.length > 0}
-              {@const giveTrades = filteredTrades.filter(trade => trade.tradeType === 'give' || trade.tradeType === 'perfect')}
+              <!-- Note: tradeType 'give' means userA can give to userB, 'receive' means userA can receive from userB -->
+              <!-- This is consistent regardless of which user is entered first in the form -->
+              {@const giveTrades = filteredTrades.filter(trade => {
+                const isGiveOrPerfect = trade.tradeType === 'give' || trade.tradeType === 'perfect';
+                if (!isGiveOrPerfect) return false;
+                
+                // Apply duplicates filter to give trades
+                if (showDuplicatesOnly) {
+                  // Show only cards where User A has duplicates to give (userACount > 1)
+                  // This means User A can give without lowering their completion rate
+                  return trade.userACount > 1;
+                }
+                
+                return true;
+              })}
               {#if giveTrades.length > 0}
                 <TradeTable
-                  title="➡️ {tradeResults.userA.username} Can Give"
+                  title="➡️ {tradeResults.userA.username} Can Give {showDuplicatesOnly ? '(Duplicates Only)' : ''}"
                   trades={giveTrades}
                   userCountField="userACount"
                   titleColor="text-orange-600"
