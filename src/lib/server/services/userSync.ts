@@ -101,6 +101,15 @@ export class UserSyncService {
             const userData = await this.fetchRipFunUserByAddress(address);
             
             if (userData) {
+              console.log(`Address ${address} returned userData:`, { 
+                id: userData.id, 
+                username: userData.username, 
+                hasId: !!userData.id, 
+                hasUsername: !!userData.username 
+              });
+            }
+            
+            if (userData && userData.id && userData.username) {
               usersFound++;
               
               // Upsert user data
@@ -109,19 +118,19 @@ export class UserSyncService {
                 create: {
                   id: userData.id,
                   username: userData.username,
-                  smartWalletAddress: userData.smart_wallet_address,
-                  ownerWalletAddress: userData.owner_wallet_address,
-                  avatar: userData.avatar,
-                  banner: userData.banner,
-                  type: userData.type
+                  smartWalletAddress: userData.smart_wallet_address || null,
+                  ownerWalletAddress: userData.owner_wallet_address || null,
+                  avatar: userData.avatar || null,
+                  banner: userData.banner || null,
+                  type: userData.type || null
                 },
                 update: {
                   username: userData.username,
-                  smartWalletAddress: userData.smart_wallet_address,
-                  ownerWalletAddress: userData.owner_wallet_address,
-                  avatar: userData.avatar,
-                  banner: userData.banner,
-                  type: userData.type,
+                  smartWalletAddress: userData.smart_wallet_address || null,
+                  ownerWalletAddress: userData.owner_wallet_address || null,
+                  avatar: userData.avatar || null,
+                  banner: userData.banner || null,
+                  type: userData.type || null,
                   updatedAt: new Date()
                 }
               });

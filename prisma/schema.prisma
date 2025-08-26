@@ -42,6 +42,7 @@ model SyncStatus {
   syncType      String   @unique // "blockchain_users"
   lastBlockNumber BigInt? // last synced block number
   lastSyncAt    DateTime @default(now())
+  lastManualSyncAt DateTime? // last manual sync triggered by user
   status        String   @default("pending") // pending, running, completed, error
   errorMessage  String?
   

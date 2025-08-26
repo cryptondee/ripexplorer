@@ -44,8 +44,16 @@
       return;
     }
     
-    // Set forceRefresh and run extraction
-    await performExtraction();
+    // Set forceRefresh to bypass cache and run extraction
+    const originalForceRefresh = forceRefresh;
+    forceRefresh = true;
+    
+    try {
+      await performExtraction();
+    } finally {
+      // Restore original forceRefresh value
+      forceRefresh = originalForceRefresh;
+    }
   }
   
   async function performExtraction() {

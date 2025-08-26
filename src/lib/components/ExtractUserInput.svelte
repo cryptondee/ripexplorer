@@ -23,6 +23,7 @@
   let syncStatus: any = $state(null);
   let syncLoading: boolean = $state(false);
   let searchTimeout: ReturnType<typeof setTimeout>;
+  let countdownInterval: ReturnType<typeof setInterval>;
   
   // Event dispatcher - Simplified events
   const dispatch = createEventDispatcher<{
@@ -95,7 +96,9 @@
   // Internal sync functionality (moved from page)
   async function triggerSync() {
     try {
+      console.log('Starting sync, syncLoading set to true');
       syncLoading = true;
+      
       const response = await fetch('/api/sync-users', {
         method: 'POST',
         headers: {
@@ -108,13 +111,20 @@
         console.log('Sync started:', data);
         await checkSyncStatus();
         dispatch('syncComplete', data);
+      } else if (response.status === 429) {
+        const errorData = await response.json();
+        console.log('Sync rate limited:', errorData);
+        await checkSyncStatus(); // Refresh status to get rate limit info
       } else {
         const errorData = await response.json();
         console.error('Sync failed:', errorData);
+        await checkSyncStatus(); // Refresh status even on error
       }
     } catch (err) {
       console.error('Sync request failed:', err);
+      await checkSyncStatus(); // Refresh status on error
     } finally {
+      console.log('Sync complete, syncLoading set to false');
       syncLoading = false;
     }
   }
@@ -126,15 +136,52 @@
       if (response.ok) {
         const data = await response.json();
         syncStatus = data;
+        
+        // Start countdown if rate limited
+        if (data.rateLimited && data.remainingMs > 0) {
+          startCountdown();
+        } else {
+          stopCountdown();
+        }
       }
     } catch (err) {
       console.warn('Failed to check sync status:', err);
     }
   }
   
-  // Check sync status on component mount
+  // Countdown timer functions
+  function startCountdown() {
+    stopCountdown(); // Clear any existing interval
+    
+    countdownInterval = setInterval(async () => {
+      if (syncStatus?.rateLimited && syncStatus?.remainingMs > 0) {
+        syncStatus.remainingMs = Math.max(0, syncStatus.remainingMs - 1000);
+        
+        // If countdown finished, refresh status
+        if (syncStatus.remainingMs <= 0) {
+          await checkSyncStatus();
+        }
+      } else {
+        stopCountdown();
+      }
+    }, 1000);
+  }
+  
+  function stopCountdown() {
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+  }
+  
+  // Check sync status on component mount and cleanup on unmount
   $effect(() => {
     checkSyncStatus();
+    
+    // Cleanup countdown on component destroy
+    return () => {
+      stopCountdown();
+    };
   });
 </script>
 
@@ -220,13 +267,18 @@
         {#if syncStatus}
           <span class="text-xs text-gray-500">
             Last sync: {syncStatus.status === 'never_run' ? 'Never' : new Date(syncStatus.lastSyncAt).toLocaleDateString()}
+            {#if syncStatus.rateLimited && syncStatus.remainingMs > 0}
+              <br>Next sync in: {Math.ceil(syncStatus.remainingMs / (60 * 1000))} min
+            {/if}
           </span>
         {/if}
         <button
           onclick={triggerSync}
-          disabled={syncLoading || disabled}
-          class="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-          title="Sync blockchain data to update user database"
+          disabled={syncLoading || disabled || (syncStatus?.rateLimited && syncStatus?.remainingMs > 0)}
+          class="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title={syncStatus?.rateLimited && syncStatus?.remainingMs > 0 
+            ? `Rate limited. Next sync available in ${Math.ceil(syncStatus.remainingMs / (60 * 1000))} minutes`
+            : "Sync blockchain data to update user database"}
         >
           {#if syncLoading}
             <svg class="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24">
@@ -238,7 +290,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
             </svg>
           {/if}
-          Sync
+          {syncStatus?.rateLimited && syncStatus?.remainingMs > 0 ? 'Rate Limited' : 'Sync'}
         </button>
       </div>
     {/if}

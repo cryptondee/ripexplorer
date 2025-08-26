@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { userSyncService } from '$lib/server/services/userSync.js';
+import { prisma } from '$lib/server/db/client.js';
 
 export const POST: RequestHandler = async ({ url, request }) => {
   try {
@@ -16,9 +17,42 @@ export const POST: RequestHandler = async ({ url, request }) => {
       );
     }
 
+    // Check rate limiting - 1 hour cooldown
+    if (currentStatus?.lastManualSyncAt) {
+      const lastSyncTime = new Date(currentStatus.lastManualSyncAt);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      
+      if (lastSyncTime > oneHourAgo) {
+        const nextAllowedSync = new Date(lastSyncTime.getTime() + 60 * 60 * 1000);
+        const remainingMs = nextAllowedSync.getTime() - Date.now();
+        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+        
+        return json(
+          { 
+            error: 'Rate limited',
+            message: `Please wait ${remainingMinutes} minutes before syncing again`,
+            nextAllowedSync: nextAllowedSync.toISOString(),
+            remainingMs
+          }, 
+          { status: 429 }
+        );
+      }
+    }
+
     // Get optional fromBlock parameter
     const body = await request.json().catch(() => ({}));
     const fromBlock = body.fromBlock ? parseInt(body.fromBlock) : undefined;
+
+    // Update lastManualSyncAt before starting sync
+    await prisma.syncStatus.upsert({
+      where: { syncType: 'blockchain_users' },
+      update: { lastManualSyncAt: new Date() },
+      create: { 
+        syncType: 'blockchain_users',
+        lastManualSyncAt: new Date(),
+        status: 'pending'
+      }
+    });
 
     // Start sync in background (don't await to avoid timeout)
     const syncPromise = userSyncService.syncUsersFromBlockchain(fromBlock);
@@ -56,12 +90,32 @@ export const GET: RequestHandler = async () => {
       });
     }
 
+    // Check if rate limited
+    let rateLimited = false;
+    let nextAllowedSync = null;
+    let remainingMs = 0;
+    
+    if (status.lastManualSyncAt) {
+      const lastSyncTime = new Date(status.lastManualSyncAt);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      
+      if (lastSyncTime > oneHourAgo) {
+        rateLimited = true;
+        nextAllowedSync = new Date(lastSyncTime.getTime() + 60 * 60 * 1000).toISOString();
+        remainingMs = new Date(lastSyncTime.getTime() + 60 * 60 * 1000).getTime() - Date.now();
+      }
+    }
+
     return json({
       syncType: status.syncType,
       status: status.status,
       lastSyncAt: status.lastSyncAt,
+      lastManualSyncAt: status.lastManualSyncAt,
       lastBlockNumber: status.lastBlockNumber?.toString(),
-      errorMessage: status.errorMessage
+      errorMessage: status.errorMessage,
+      rateLimited,
+      nextAllowedSync,
+      remainingMs: rateLimited ? Math.max(0, remainingMs) : 0
     });
 
   } catch (error) {
