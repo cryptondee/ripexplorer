@@ -1,9 +1,52 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { getSetNameFromCard } from '$lib/utils/card';
+  import { batchFetchSetTotals, calculateCompletionPercentage, getCompletionBadgeColor } from '$lib/utils/setCompletion';
   
   // Props
   export let extractedData: any;
   export let setCardsData: any;
+  
+  // State for set completion data
+  let setCompletions: Record<string, { total: number; percentage: number }> = {};
+  let loadingCompletions = true;
+  
+  // Load set completion data
+  onMount(async () => {
+    if (extractedData.profile.digital_cards?.length > 0) {
+      // Get unique set IDs from cards
+      const setIds = [...new Set(
+        extractedData.profile.digital_cards
+          .map((card: any) => card.card?.set_id)
+          .filter((id: string) => id)
+      )];
+      
+      try {
+        const setTotals = await batchFetchSetTotals(setIds);
+        
+        // Calculate completion for each set
+        const completions: Record<string, { total: number; percentage: number }> = {};
+        Object.entries(setTotals).forEach(([setId, total]) => {
+          const ownedInSet = extractedData.profile.digital_cards.filter(
+            (card: any) => card.card?.set_id === setId
+          ).length;
+          
+          completions[setId] = {
+            total,
+            percentage: calculateCompletionPercentage(ownedInSet, total)
+          };
+        });
+        
+        setCompletions = completions;
+      } catch (error) {
+        console.warn('Failed to load set completion data:', error);
+      } finally {
+        loadingCompletions = false;
+      }
+    } else {
+      loadingCompletions = false;
+    }
+  });
 </script>
 
 {#if extractedData.profile.digital_cards && extractedData.profile.digital_cards.length > 0}
@@ -47,6 +90,25 @@
               <span>Total Value:</span>
               <span class="font-medium text-gray-900">${setData.totalValue.toFixed(2)}</span>
             </div>
+            
+            <!-- Set Completion -->
+            {#if setCompletions[setData.setId] && !loadingCompletions}
+              {@const completion = setCompletions[setData.setId]}
+              <div class="flex justify-between items-center">
+                <span>Completion:</span>
+                <div class="flex items-center space-x-2">
+                  <span class="text-xs">{setData.count}/{completion.total}</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {getCompletionBadgeColor(completion.percentage)}">
+                    {completion.percentage}%
+                  </span>
+                </div>
+              </div>
+            {:else if loadingCompletions}
+              <div class="flex justify-between items-center">
+                <span>Completion:</span>
+                <div class="animate-pulse bg-gray-200 h-4 w-16 rounded"></div>
+              </div>
+            {/if}
             {#if setData.releaseDate}
               <div class="flex justify-between">
                 <span>Released:</span>

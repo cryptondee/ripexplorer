@@ -3,6 +3,12 @@
   import TradeTable from '$lib/components/TradeTable.svelte';
   import UserSearchInput from '$lib/components/UserSearchInput.svelte';
   import SetSummaryTable from '$lib/components/trade/SetSummaryTable.svelte';
+  import TradeFilters from '$lib/components/TradeFilters.svelte';
+  import FilteredTradeSummary from '$lib/components/FilteredTradeSummary.svelte';
+  import TradeSummaryCards from '$lib/components/TradeSummaryCards.svelte';
+  import TradeValueAnalysis from '$lib/components/TradeValueAnalysis.svelte';
+  import TradeQuickActions from '$lib/components/TradeQuickActions.svelte';
+  import { batchFetchSetTotals, calculateCompletionPercentage } from '$lib/utils/setCompletion';
   import { buildUserSetSummaryFromCounts } from '$lib/utils/trade/summaries';
   import { openCardModal } from '$lib/stores/modalStore';
   
@@ -22,7 +28,6 @@
   let filteredTrades: any[] = [];
   let availableSets: any[] = [];
   let availableRarities: string[] = [];
-  let totalPages = 1;
 
   // Caches and derived data for summaries
   let setTotals: Record<string, number> = {};
@@ -48,7 +53,7 @@
     const total = setTotals[setId];
     
     if (!owned || !total) return 0;
-    return Math.round((owned / total) * 100);
+    return calculateCompletionPercentage(owned, total);
   }
 
   // Handle card clicks to show modal
@@ -135,20 +140,7 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
     }
   }
 
-  async function getSetTotal(id: string): Promise<number> {
-    if (!id) return 0;
-    if (setTotals[id] !== undefined) return setTotals[id];
-    try {
-      const res = await fetch(`/api/set/${id}`);
-      const data = await res.json();
-      const total = Array.isArray(data?.cards) ? data.cards.length : 0;
-      setTotals[id] = total;
-      return total;
-    } catch (e) {
-      setTotals[id] = 0;
-      return 0;
-    }
-  }
+  // getSetTotal removed - now using shared utility from setCompletion.ts
 
   async function refreshSummaries(): Promise<void> {
     if (!tradeResults) return;
@@ -162,14 +154,22 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
 
     summariesLoading = true;
     try {
-      // Preload totals for all involved set ids (owned or missing)
+      // Preload totals for all involved set ids (owned or missing) 
       const ids = Array.from(new Set([
         ...Object.keys(ownedA),
         ...Object.keys(ownedB),
         ...Object.keys(missingA),
         ...Object.keys(missingB)
       ]));
-      await Promise.all(ids.map((id) => getSetTotal(id)));
+      
+      // Fetch any missing set totals
+      const missingSetIds = ids.filter(id => !setTotals[id]);
+      if (missingSetIds.length > 0) {
+        const newTotals = await batchFetchSetTotals(missingSetIds);
+        Object.entries(newTotals).forEach(([setId, total]) => {
+          setTotals[setId] = total;
+        });
+      }
 
       // Build from owned counts but enforce Owned = Total - Missing (unique)
       userSummaryA = buildUserSetSummaryFromCounts(ownedA, {
@@ -179,7 +179,7 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
         const total = setTotals[row.setId] ?? row.total ?? 0;
         const missing = Number(missingA[row.setId] || 0);
         const owned = Math.max(0, total - missing);
-        const percent = total > 0 ? Math.min(100, Math.round((owned / total) * 100)) : 0;
+        const percent = calculateCompletionPercentage(owned, total);
         return { ...row, owned, total, percent };
       }).sort((a: any, b: any) => (b.percent - a.percent) || a.setName.localeCompare(b.setName));
 
@@ -190,7 +190,7 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
         const total = setTotals[row.setId] ?? row.total ?? 0;
         const missing = Number(missingB[row.setId] || 0);
         const owned = Math.max(0, total - missing);
-        const percent = total > 0 ? Math.min(100, Math.round((owned / total) * 100)) : 0;
+        const percent = calculateCompletionPercentage(owned, total);
         return { ...row, owned, total, percent };
       }).sort((a: any, b: any) => (b.percent - a.percent) || a.setName.localeCompare(b.setName));
     } finally {
@@ -245,10 +245,16 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
         
         availableRarities = Array.from(raritySet).sort();
         
-        // Populate setTotals from availableSets
-        availableSets.forEach(set => {
-          setTotals[set.id] = set.totalCards || 0;
+        // Fetch set totals for all available sets
+        const setIds = availableSets.map(set => set.id);
+        const fetchedTotals = await batchFetchSetTotals(setIds);
+        
+        // Populate setTotals with fetched data
+        Object.entries(fetchedTotals).forEach(([setId, total]) => {
+          setTotals[setId] = total;
         });
+        
+        console.log('Set totals loaded:', setTotals);
         
         // Set default selection: prefer "151" (sv3pt5) if available, otherwise first set
         const preferredSet = availableSets.find(set => set.id === 'sv3pt5' || set.name?.includes('151'));
@@ -313,7 +319,7 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
         }
         
         filteredTrades = trades;
-        totalPages = data.pagination?.totalPages || 1;
+        // totalPages removed - not used after componentization
         console.log(`Loaded ${filteredTrades.length} trades for set ${selectedSet}, rarity ${selectedRarity}, type ${selectedTradeType}, page ${currentPage}`);
       } else {
         console.error('Failed to load filtered trades:', data.error);
@@ -339,31 +345,6 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
     await loadFilteredTrades();
   }
 
-  // Handle page changes
-  async function goToPage(page: number): Promise<void> {
-    currentPage = page;
-    await loadFilteredTrades();
-  }
-
-  function getTradeTypeColor(tradeType: string): string {
-    switch (tradeType) {
-      case 'perfect': return 'bg-green-100 text-green-800 border-green-300';
-      case 'receive': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'give': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'impossible': return 'bg-gray-100 text-gray-600 border-gray-300';
-      default: return 'bg-gray-100 text-gray-600 border-gray-300';
-    }
-  }
-
-  function getTradeTypeIcon(tradeType: string): string {
-    switch (tradeType) {
-      case 'perfect': return '🎯';
-      case 'receive': return '⬅️';
-      case 'give': return '➡️';  
-      case 'impossible': return '❌';
-      default: return '❔';
-    }
-  }
 
   function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('en-US', {
@@ -493,27 +474,7 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
         </div>
 
         <!-- Trade Summary -->
-        <div class="bg-white rounded-lg shadow-md p-8">
-          <h2 class="text-xl font-bold mb-4">📊 Trade Summary</h2>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div class="text-center p-6 bg-green-50 rounded-lg border-2 border-green-200">
-              <p class="text-2xl font-bold text-green-600">{tradeResults.tradeAnalysis.summary.totalPerfectTrades}</p>
-              <p class="text-sm text-green-700">Perfect Trades</p>
-            </div>
-            <div class="text-center p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
-              <p class="text-2xl font-bold text-blue-600">{tradeResults.tradeAnalysis.summary.totalOneWayToA}</p>
-              <p class="text-sm text-blue-700">Can Receive</p>
-            </div>
-            <div class="text-center p-6 bg-orange-50 rounded-lg border-2 border-orange-200">
-              <p class="text-2xl font-bold text-orange-600">{tradeResults.tradeAnalysis.summary.totalOneWayToB}</p>
-              <p class="text-sm text-orange-700">Can Give</p>
-            </div>
-            <div class="text-center p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
-              <p class="text-2xl font-bold text-gray-600">{tradeResults.tradeAnalysis.summary.totalImpossible}</p>
-              <p class="text-sm text-gray-700">Both Missing</p>
-            </div>
-          </div>
-        </div>
+        <TradeSummaryCards tradeSummary={tradeResults.tradeAnalysis.summary} />
 
         <!-- Recommendations -->
         {#if tradeResults.recommendations && tradeResults.recommendations.length > 0}
@@ -532,114 +493,27 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
         <!-- Trade Results Tables -->
         {#if availableSets.length > 0}
           <!-- Filters -->
-          <div class="bg-white rounded-lg shadow-md p-8 mb-8">
-            <h2 class="text-xl font-bold mb-4">🔄 Trade Opportunities</h2>
-            
-            <div class="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-8 bg-gray-50 p-6 rounded-lg">
-              <!-- Set Filter -->
-              <div class="flex items-center space-x-2">
-                <label for="setFilter" class="text-sm font-medium text-gray-700 whitespace-nowrap">Set:</label>
-                <select 
-                  id="setFilter" 
-                  bind:value={selectedSet}
-                  on:change={handleSetChange}
-                  class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {#each sortedAvailableSets as set}
-                    <option value={set.id}>{set.name} - {getSetCompletion(set.id, 'A')}% complete ({set.count})</option>
-                  {/each}
-                  <option value="all">All Sets</option>
-                </select>
-              </div>
-
-              <!-- Rarity Filter -->
-              <div class="flex items-center space-x-2">
-                <label for="rarityFilter" class="text-sm font-medium text-gray-700 whitespace-nowrap">Rarity:</label>
-                <select 
-                  id="rarityFilter" 
-                  bind:value={selectedRarity}
-                  on:change={handleRarityChange}
-                  class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Rarities</option>
-                  {#each availableRarities as rarity}
-                    <option value={rarity}>{rarity.charAt(0).toUpperCase() + rarity.slice(1)}</option>
-                  {/each}
-                </select>
-              </div>
-
-              <!-- Show Duplicates Only -->
-              <div class="flex items-center space-x-2">
-                <label class="flex items-center text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    bind:checked={showDuplicatesOnly}
-                    on:change={handleSetChange}
-                    class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  Show Duplicates Only
-                </label>
-              </div>
-
-              <!-- Clear Filters -->
-              <button
-                type="button"
-                on:click={() => {
-                  selectedSet = 'all';
-                  selectedRarity = 'all';
-                  selectedTradeType = 'all';
-                  showDuplicatesOnly = false;
-                  handleSetChange();
-                }}
-                class="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
-              >
-                Clear Filters
-              </button>
-            </div>
-          </div>
+          <TradeFilters
+            bind:selectedSet
+            bind:selectedRarity
+            bind:selectedTradeType
+            bind:showDuplicatesOnly
+            {sortedAvailableSets}
+            {availableRarities}
+            {getSetCompletion}
+            on:setChange={handleSetChange}
+            on:rarityChange={handleRarityChange}
+            on:tradeTypeChange={handleTradeTypeChange}
+            on:duplicatesToggle={handleSetChange}
+            on:clearFilters={handleSetChange}
+          />
 
           <!-- Filtered Trade Summary -->
-          {#if filteredTradeSummary.giveTrades.length > 0 || filteredTradeSummary.receiveTrades.length > 0}
-            <div class="bg-white rounded-lg shadow-md p-8 mb-8">
-              <div class="flex justify-between items-start mb-4">
-                <h2 class="text-xl font-bold text-gray-900">
-                  💼 Current Filter Summary {showDuplicatesOnly ? '(Duplicates Only)' : ''}
-                </h2>
-                <button
-                  type="button"
-                  on:click={copyTradeSummary}
-                  class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  📋 Copy Summary
-                </button>
-              </div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Give Summary -->
-                <div class="text-center p-6 bg-orange-50 rounded-lg border-2 border-orange-200">
-                  <p class="text-2xl font-bold text-orange-600">${filteredTradeSummary.giveValue.toFixed(2)}</p>
-                  <p class="text-sm text-orange-700">{filteredTradeSummary.giveTrades.length} Cards to Give</p>
-                </div>
-                
-                <!-- Receive Summary -->
-                <div class="text-center p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
-                  <p class="text-2xl font-bold text-blue-600">${filteredTradeSummary.receiveValue.toFixed(2)}</p>
-                  <p class="text-sm text-blue-700">{filteredTradeSummary.receiveTrades.length} Cards to Receive</p>
-                </div>
-                
-                <!-- Balance -->
-                {#if true}
-                  {@const balanceDiff = filteredTradeSummary.receiveValue - filteredTradeSummary.giveValue}
-                  <div class="text-center p-6 rounded-lg border-2 {balanceDiff > 0 ? 'bg-green-50 border-green-200' : balanceDiff < 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}">
-                    <p class="text-2xl font-bold {balanceDiff > 0 ? 'text-green-600' : balanceDiff < 0 ? 'text-red-600' : 'text-gray-600'}">
-                      {balanceDiff > 0 ? '+' : ''}${balanceDiff.toFixed(2)}
-                    </p>
-                    <p class="text-sm {balanceDiff > 0 ? 'text-green-700' : balanceDiff < 0 ? 'text-red-700' : 'text-gray-700'}">Trade Balance</p>
-                  </div>
-                {/if}
-              </div>
-            </div>
-          {/if}
+          <FilteredTradeSummary
+            {filteredTradeSummary}
+            {showDuplicatesOnly}
+            on:copySummary={copyTradeSummary}
+          />
 
           <!-- Two Tables Side by Side -->
           <div class="grid grid-cols-1 xl:grid-cols-2 gap-12">
@@ -709,91 +583,19 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
         {/if}
 
         <!-- Trade Balance Analysis -->
-        {#if tradeResults.tradeAnalysis.summary.estimatedPerfectTradeValue > 0 || tradeResults.tradeAnalysis.summary.estimatedOneWayToAValue > 0 || tradeResults.tradeAnalysis.summary.estimatedOneWayToBValue > 0}
-          <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-bold mb-4">⚖️ Trade Value Analysis</h2>
-            <div class="grid md:grid-cols-3 gap-4">
-              <div class="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-                <p class="text-lg font-bold text-green-600">
-                  {formatCurrency(tradeResults.tradeAnalysis.summary.estimatedPerfectTradeValue)}
-                </p>
-                <p class="text-sm text-green-700">Perfect Trades Value</p>
-              </div>
-              <div class="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p class="text-lg font-bold text-blue-600">
-                  {formatCurrency(tradeResults.tradeAnalysis.summary.estimatedOneWayToAValue)}
-                </p>
-                <p class="text-sm text-blue-700">{tradeResults.userA.username} Can Receive</p>
-              </div>
-              <div class="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
-                <p class="text-lg font-bold text-orange-600">
-                  {formatCurrency(tradeResults.tradeAnalysis.summary.estimatedOneWayToBValue)}
-                </p>
-                <p class="text-sm text-orange-700">{tradeResults.userA.username} Can Give</p>
-              </div>
-            </div>
-            
-            <!-- Trade Balance Indicator -->
-            <div class="mt-4 p-4 rounded-lg {tradeResults.tradeAnalysis.summary.tradeBalance === 'even' ? 'bg-gray-50 border border-gray-200' : tradeResults.tradeAnalysis.summary.tradeBalance === 'favors_a' ? 'bg-blue-50 border border-blue-200' : 'bg-orange-50 border border-orange-200'}">
-              <div class="flex items-center justify-center space-x-2">
-                <span class="text-lg">
-                  {#if tradeResults.tradeAnalysis.summary.tradeBalance === 'even'}
-                    ⚖️
-                  {:else if tradeResults.tradeAnalysis.summary.tradeBalance === 'favors_a'}
-                    ⬅️
-                  {:else}
-                    ➡️
-                  {/if}
-                </span>
-                <span class="font-medium {tradeResults.tradeAnalysis.summary.tradeBalance === 'even' ? 'text-gray-700' : tradeResults.tradeAnalysis.summary.tradeBalance === 'favors_a' ? 'text-blue-700' : 'text-orange-700'}">
-                  {#if tradeResults.tradeAnalysis.summary.tradeBalance === 'even'}
-                    Trade values are well balanced
-                  {:else if tradeResults.tradeAnalysis.summary.tradeBalance === 'favors_a'}
-                    Trade favors {tradeResults.userA.username}
-                  {:else}
-                    Trade favors {tradeResults.userB.username}
-                  {/if}
-                </span>
-              </div>
-            </div>
-          </div>
-        {/if}
+        <TradeValueAnalysis
+          tradeAnalysis={tradeResults.tradeAnalysis}
+          userA={tradeResults.userA}
+          userB={tradeResults.userB}
+          {formatCurrency}
+        />
 
         <!-- Quick Action Buttons -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h2 class="text-xl font-bold mb-4">🚀 Quick Actions</h2>
-          <div class="flex flex-wrap gap-4">
-            <button 
-              type="button"
-              on:click={() => window.open(`https://www.rip.fun/profile/${tradeResults.userA.username}`, '_blank')}
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              🔗 View {tradeResults.userA.username} on rip.fun
-            </button>
-            <button 
-              type="button"
-              on:click={() => window.open(`https://www.rip.fun/profile/${tradeResults.userB.username}`, '_blank')}
-              class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              🔗 View {tradeResults.userB.username} on rip.fun
-            </button>
-            <button 
-              type="button"
-              on:click={() => {
-                const summary = `Trade Analysis: ${tradeResults.userA.username} vs ${tradeResults.userB.username}\n` +
-                               `Perfect Trades: ${tradeResults.tradeAnalysis.summary.totalPerfectTrades}\n` +
-                               `${tradeResults.userA.username} can receive: ${tradeResults.tradeAnalysis.summary.totalOneWayToA} cards\n` +
-                               `${tradeResults.userA.username} can give: ${tradeResults.tradeAnalysis.summary.totalOneWayToB} cards\n` +
-                               `Generated on: ${new Date().toLocaleDateString()}`;
-                navigator.clipboard.writeText(summary);
-                alert('Trade summary copied to clipboard!');
-              }}
-              class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              📋 Copy Trade Summary
-            </button>
-          </div>
-        </div>
+        <TradeQuickActions
+          userA={tradeResults.userA}
+          userB={tradeResults.userB}
+          tradeAnalysis={tradeResults.tradeAnalysis}
+        />
 
         <!-- No Trades Available -->
         {#if tradeResults && availableSets.length === 0}
