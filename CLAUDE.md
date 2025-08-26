@@ -736,6 +736,58 @@ Follow service-oriented patterns in `src/lib/server/services/`:
 3. Use TypeScript interfaces for request/response types
 4. Follow established patterns in existing services
 
+## 🐛 Known Issues & Debugging Context
+
+### Trade-Finder Display Issues (December 2025)
+
+**Issue**: Trade-finder sometimes doesn't show tables for certain user comparisons (e.g., cryptondee vs tk_ on 151 set)
+
+**Root Cause Analysis:**
+- **API Layer**: The `/api/trade-compare` GET endpoint was missing `availableSets` in response, causing frontend filter dropdown to be empty
+- **Frontend Logic**: When `availableSets.length === 0`, the frontend doesn't display trade tables even when trades exist
+- **Data Flow**: POST endpoint returns `availableSets` correctly, but GET endpoint (used for filtering) was missing this data
+
+**Initial Fix Applied:**
+```typescript
+// Added to GET endpoint in /api/trade-compare/+server.ts
+const availableSets = tradeAnalyzer.getAvailableSets(collectionA, collectionB);
+
+return json({
+  success: true,
+  trades: paginatedTrades,
+  availableSets, // ← Added this line
+  // ... rest of response
+});
+```
+
+**Current Status**: Partial fix applied but still not working properly according to user feedback
+
+**Next Debugging Steps:**
+1. Test the actual frontend behavior in browser for cryptondee vs tk_ comparison
+2. Check if `availableSets` data is properly received by frontend
+3. Verify frontend logic that conditionally shows/hides tables based on `availableSets.length`
+4. Examine console logs in both browser and server for additional error details
+5. Check if there are additional conditions preventing table display
+
+**Related Files:**
+- `/src/routes/api/trade-compare/+server.ts` (API endpoint)
+- `/src/routes/trade-finder/+page.svelte` (Frontend component)
+- `/src/lib/server/services/tradeAnalyzer.ts` (Business logic)
+
+**Testing Commands:**
+```bash
+# Test API directly
+node -e "fetch('http://localhost:5173/api/trade-compare', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userA: 'cryptondee', userB: 'tk_'})}).then(r => r.json()).then(d => console.log('Available sets:', d.availableSets?.length))"
+
+# Test GET endpoint with filtering
+node -e "fetch('http://localhost:5173/api/trade-compare?userA=cryptondee&userB=tk_&set=sv3pt5').then(r => r.json()).then(d => console.log('GET sets:', d.availableSets?.length, 'trades:', d.trades?.length))"
+```
+
+**Debugging Notes:**
+- API endpoints return success and correct data structure
+- Issue appears to be in frontend display logic or data binding
+- May need to examine Svelte reactivity and conditional rendering logic
+
 ## 📚 Component Documentation
 
 Each component and service directory contains detailed CLAUDE.md files explaining:
