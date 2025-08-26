@@ -81,6 +81,10 @@
           aValue = getListedPrice(a);
           bValue = getListedPrice(b);
           break;
+        case 'quantity':
+          aValue = a.quantity || 1;
+          bValue = b.quantity || 1;
+          break;
         default:
           return 0;
       }
@@ -115,12 +119,38 @@
     return cards.slice(startIndex, endIndex);
   }
   
-  // Derived states for card processing
-  const filteredCards = $derived.by(() => {
+  // Process cards to add quantity information
+  const cardsWithQuantity = $derived.by(() => {
     let cards = selectedSet === 'all' ? combinedCards : (cardsBySet[selectedSet]?.cards || []);
     
+    // Group cards by unique identifier to calculate quantities
+    const cardGroups: { [key: string]: any[] } = {};
+    const allUserCards = extractedData?.profile?.digital_cards || [];
+    
+    // Group all user cards by card identifier
+    allUserCards.forEach((userCard: any) => {
+      const cardKey = `${userCard.card?.id || userCard.card?.name}_${userCard.card?.card_number}_${userCard.card?.set_id}`;
+      if (!cardGroups[cardKey]) {
+        cardGroups[cardKey] = [];
+      }
+      cardGroups[cardKey].push(userCard);
+    });
+    
+    // Add quantity to each card
+    return cards.map((card: any) => {
+      const cardKey = `${card.card?.id || card.card?.name}_${card.card?.card_number}_${card.card?.set_id}`;
+      const quantity = cardGroups[cardKey]?.length || 1;
+      return {
+        ...card,
+        quantity
+      };
+    });
+  });
+  
+  // Derived states for card processing
+  const filteredCards = $derived.by(() => {
     // Apply filters
-    return cards.filter((card: any) => {
+    return cardsWithQuantity.filter((card: any) => {
       const matchesSearch = !searchQuery || 
         (card.card?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (card.card?.card_number || '').includes(searchQuery) ||

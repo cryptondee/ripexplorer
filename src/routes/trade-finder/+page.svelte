@@ -1,6 +1,6 @@
 <script lang="ts">
   import TradeTable from '$lib/components/TradeTable.svelte';
-  import UserSearchInput from '$lib/components/UserSearchInput.svelte';
+  import ExtractUserInput from '$lib/components/ExtractUserInput.svelte';
   import SetSummaryTable from '$lib/components/trade/SetSummaryTable.svelte';
   import TradeFilters from '$lib/components/TradeFilters.svelte';
   import FilteredTradeSummary from '$lib/components/FilteredTradeSummary.svelte';
@@ -63,7 +63,9 @@
   // Handle card clicks to show modal
   function handleCardClick(trade: any) {
     if (trade && trade.card) {
-      openCardModal(trade.card);
+      // For trade finder, we don't have access to all user cards for duplicates,
+      // so just show the single card
+      openCardModal(trade.card, []);
     }
   }
   
@@ -454,18 +456,20 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
     <div class="bg-white rounded-lg shadow-md p-8 mb-12">
       <div class="grid md:grid-cols-2 gap-8">
         <!-- User A Input -->
-        <UserSearchInput
-          bind:value={userA}
+        <ExtractUserInput
+          bind:selectedUserId={userA}
           label="First User (Name or ID)"
           placeholder="Enter user..."
+          showSyncFeatures={false}
           on:change={() => {}}
         />
 
         <!-- User B Input -->
-        <UserSearchInput
-          bind:value={userB}
+        <ExtractUserInput
+          bind:selectedUserId={userB}
           label="Second User (Name or ID)"
           placeholder="Enter user..."
+          showSyncFeatures={false}
           on:change={() => {}}
         />
       </div>

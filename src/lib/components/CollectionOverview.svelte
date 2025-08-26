@@ -27,9 +27,11 @@
         // Calculate completion for each set
         const completions: Record<string, { total: number; percentage: number }> = {};
         Object.entries(setTotals).forEach(([setId, total]) => {
-          const ownedInSet = extractedData.profile.digital_cards.filter(
-            (card: any) => card.card?.set_id === setId
-          ).length;
+          const ownedInSet = [...new Set(
+            extractedData.profile.digital_cards
+              .filter((card: any) => card.card?.set_id === setId)
+              .map((card: any) => `${card.card?.id || card.card?.name}_${card.card?.card_number}`)
+          )].length;
           
           completions[setId] = {
             total,
@@ -50,7 +52,15 @@
 </script>
 
 {#if extractedData.profile.digital_cards && extractedData.profile.digital_cards.length > 0}
-  {@const setStats = extractedData.profile.digital_cards.reduce((stats: any, card: any) => {
+  {@const uniqueCards = extractedData.profile.digital_cards.reduce((unique: any[], card: any) => {
+    const cardKey = `${card.card?.id || card.card?.name}_${card.card?.card_number}_${card.card?.set_id}`;
+    const existingCard = unique.find(c => `${c.card?.id || c.card?.name}_${c.card?.card_number}_${c.card?.set_id}` === cardKey);
+    if (!existingCard) {
+      unique.push(card);
+    }
+    return unique;
+  }, [])}
+  {@const setStats = uniqueCards.reduce((stats: any, card: any) => {
     const setName = getSetNameFromCard(card, setCardsData);
     const rarity = card.card?.rarity || 'Unknown';
     const value = parseFloat(card.listing?.usd_price || card.card?.raw_price || '0');

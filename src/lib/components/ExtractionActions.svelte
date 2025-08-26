@@ -80,6 +80,7 @@
         },
         body: JSON.stringify({
           username: ripUserId.trim(),
+          forceRefresh: forceRefresh,
           method: 'api'
         }),
       });

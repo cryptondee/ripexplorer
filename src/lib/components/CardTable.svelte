@@ -93,6 +93,40 @@
           </div>
         </th>
 
+        <!-- Card Number Column -->
+        <th 
+          scope="col" 
+          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          on:click={() => handleSort('card_number')}
+          role="button"
+          tabindex="0"
+          on:keydown={(e) => e.key === 'Enter' && handleSort('card_number')}
+        >
+          <div class="flex items-center space-x-1">
+            <span>Card #</span>
+            {#if sortColumn === 'card_number'}
+              <span class="text-indigo-600">{getSortIcon('card_number')}</span>
+            {/if}
+          </div>
+        </th>
+
+        <!-- Quantity Column -->
+        <th 
+          scope="col" 
+          class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          on:click={() => handleSort('quantity')}
+          role="button"
+          tabindex="0"
+          on:keydown={(e) => e.key === 'Enter' && handleSort('quantity')}
+        >
+          <div class="flex items-center space-x-1">
+            <span>Qty</span>
+            {#if sortColumn === 'quantity'}
+              <span class="text-indigo-600">{getSortIcon('quantity')}</span>
+            {/if}
+          </div>
+        </th>
+
         <!-- Set Column -->
         <th 
           scope="col" 
@@ -224,11 +258,24 @@
                 <div class="text-sm font-medium text-gray-900">
                   {card.card?.name || 'Unknown Card'}
                 </div>
-                {#if card.card?.card_number}
-                  <div class="text-sm text-gray-500">#{card.card.card_number}</div>
-                {/if}
               </div>
             </div>
+          </td>
+
+          <!-- Card Number Column -->
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            {#if card.card?.card_number}
+              #{card.card.card_number}
+            {:else}
+              —
+            {/if}
+          </td>
+
+          <!-- Quantity Column -->
+          <td class="px-6 py-4 whitespace-nowrap text-center">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              {card.quantity || 1}
+            </span>
           </td>
 
           <!-- Set Column -->

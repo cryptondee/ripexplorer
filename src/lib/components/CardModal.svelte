@@ -1,6 +1,6 @@
 <!-- Card Detail Modal Component -->
 <script lang="ts">
-  import { isCardModalOpen, selectedCard, closeCardModal } from '$lib/stores/modalStore';
+  import { isCardModalOpen, selectedCard, allCardsForModal, selectedCardIndex, closeCardModal, setSelectedCardIndex } from '$lib/stores/modalStore';
   import { getSetNameFromCard } from '$lib/utils/card';
   
   // Modal is now fully self-contained and doesn't need external props
@@ -95,6 +95,57 @@
         </button>
       </div>
       
+      <!-- Gallery Navigation for Duplicates -->
+      {#if $allCardsForModal.length > 1}
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+          <div class="text-center mb-3">
+            <span class="text-sm font-medium text-gray-900">
+              Showing {$selectedCardIndex + 1} of {$allCardsForModal.length} copies
+            </span>
+          </div>
+          
+          <!-- Card Gallery Thumbnails -->
+          <div class="flex justify-center gap-2 overflow-x-auto pb-2">
+            {#each $allCardsForModal as card, index}
+              <button 
+                class="flex-shrink-0 w-16 h-20 border-2 {$selectedCardIndex === index ? 'border-blue-500' : 'border-gray-300'} rounded overflow-hidden hover:border-blue-400 transition-colors"
+                onclick={() => setSelectedCardIndex(index)}
+              >
+                {#if card.card?.small_image_url}
+                  <img 
+                    src={card.card.small_image_url} 
+                    alt={card.card?.name} 
+                    class="w-full h-full object-cover"
+                  />
+                {:else}
+                  <div class="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <span class="text-xs text-gray-500">#{card.card?.card_number}</span>
+                  </div>
+                {/if}
+              </button>
+            {/each}
+          </div>
+          
+          <!-- Navigation Buttons -->
+          <div class="flex justify-center gap-2 mt-3">
+            <button 
+              onclick={() => setSelectedCardIndex(Math.max(0, $selectedCardIndex - 1))}
+              disabled={$selectedCardIndex === 0}
+              class="px-3 py-1 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded text-sm"
+            >
+              ← Previous
+            </button>
+            <button 
+              onclick={() => setSelectedCardIndex(Math.min($allCardsForModal.length - 1, $selectedCardIndex + 1))}
+              disabled={$selectedCardIndex === $allCardsForModal.length - 1}
+              class="px-3 py-1 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded text-sm"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      {/if}
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Card Image -->
         <div class="flex flex-col items-center">
@@ -177,12 +228,6 @@
                 <div class="flex justify-between">
                   <dt class="text-gray-500">Type:</dt>
                   <dd class="text-gray-900">{cardData.types.join(', ')}</dd>
-                </div>
-              {/if}
-              {#if cardData?.hp}
-                <div class="flex justify-between">
-                  <dt class="text-gray-500">HP:</dt>
-                  <dd class="text-gray-900">{cardData.hp}</dd>
                 </div>
               {/if}
               {#if cardData?.supertype}
@@ -280,8 +325,18 @@
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Unique ID:</dt>
-                <dd class="text-gray-900 font-mono text-xs">{$selectedCard.unique_id}</dd>
+                <dd class="text-gray-900 font-mono text-xs break-all">{$selectedCard.unique_id}</dd>
               </div>
+              {#if $allCardsForModal.length > 1}
+                <div class="flex justify-between">
+                  <dt class="text-gray-500">Instance:</dt>
+                  <dd class="text-gray-900">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {$selectedCardIndex + 1} of {$allCardsForModal.length}
+                    </span>
+                  </dd>
+                </div>
+              {/if}
             </dl>
           </div>
         </div>

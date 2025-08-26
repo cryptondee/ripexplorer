@@ -1,13 +1,19 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   
-  // Props - Simplified interface using Svelte 5 runes
+  // Props - Enhanced interface for reusability
   let {
     selectedUserId = $bindable(''),
-    disabled = false
+    disabled = false,
+    label = 'Enter rip.fun Username or User ID',
+    placeholder = 'Enter username or ID...',
+    showSyncFeatures = true
   }: {
     selectedUserId?: string;
     disabled?: boolean;
+    label?: string;
+    placeholder?: string;
+    showSyncFeatures?: boolean;
   } = $props();
   
   // Internal state - Component owns this data
@@ -22,11 +28,15 @@
   const dispatch = createEventDispatcher<{
     userSelected: { username: string; userId: string };
     syncComplete: any;
+    change: string;
   }>();
   
   // Internal search logic (moved from page)
   function handleUserInput() {
     clearTimeout(searchTimeout);
+    
+    // Dispatch change event for compatibility
+    dispatch('change', selectedUserId);
     
     if (selectedUserId.trim().length < 2) {
       searchResults = [];
@@ -130,7 +140,7 @@
 
 <div class="relative">
   <label for="ripUserId" class="block text-sm font-medium text-gray-700">
-    rip.fun User or ID
+    {label}
   </label>
   <div class="mt-1 flex rounded-md shadow-sm">
     <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
@@ -144,7 +154,7 @@
       onblur={hideSearchResults}
       {disabled}
       class="block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-      placeholder="Enter user (e.g., Poketard) or ID (e.g., 2010)"
+      placeholder={placeholder}
       autocomplete="off"
       aria-label="Search for rip.fun user"
       aria-describedby="user-search-description"
@@ -204,31 +214,33 @@
       Enter a user (e.g., "Poketard") or ID (e.g., "2010") to extract their complete card collection.
     </p>
     
-    <!-- Sync Button -->
-    <div class="flex items-center space-x-2">
-      {#if syncStatus}
-        <span class="text-xs text-gray-500">
-          Last sync: {syncStatus.status === 'never_run' ? 'Never' : new Date(syncStatus.lastSyncAt).toLocaleDateString()}
-        </span>
-      {/if}
-      <button
-        onclick={triggerSync}
-        disabled={syncLoading || disabled}
-        class="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-        title="Sync blockchain data to update user database"
-      >
-        {#if syncLoading}
-          <svg class="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        {:else}
-          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
+    <!-- Sync Button (conditional) -->
+    {#if showSyncFeatures}
+      <div class="flex items-center space-x-2">
+        {#if syncStatus}
+          <span class="text-xs text-gray-500">
+            Last sync: {syncStatus.status === 'never_run' ? 'Never' : new Date(syncStatus.lastSyncAt).toLocaleDateString()}
+          </span>
         {/if}
-        Sync
-      </button>
-    </div>
+        <button
+          onclick={triggerSync}
+          disabled={syncLoading || disabled}
+          class="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+          title="Sync blockchain data to update user database"
+        >
+          {#if syncLoading}
+            <svg class="animate-spin -ml-1 mr-1 h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          {:else}
+            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          {/if}
+          Sync
+        </button>
+      </div>
+    {/if}
   </div>
 </div>

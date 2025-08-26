@@ -6,8 +6,7 @@
   import SetDataManager from '$lib/components/SetDataManager.svelte';
   import ExtractionActions from '$lib/components/ExtractionActions.svelte';
   import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
-  import ExtractionInfo from '$lib/components/ExtractionInfo.svelte';
-  import ProfileSummary from '$lib/components/ProfileSummary.svelte';
+  import ProfileInfo from '$lib/components/ProfileInfo.svelte';
   import CollectionOverview from '$lib/components/CollectionOverview.svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   
@@ -58,9 +57,11 @@
   
   // Handle card click to show modal
   // Card modal functions now use store-based state management
-  // Simplified modal handler - matches trade-finder pattern
+  // Enhanced modal handler to show duplicate cards as gallery
   function handleCardClick(card: any) {
-    openCardModal(card);
+    // Pass all digital_cards to enable duplicate detection
+    const allCards = $extractedData?.profile?.digital_cards || [];
+    openCardModal(card, allCards);
   }
   
 
@@ -160,8 +161,9 @@
 
     {#if $extractedData}
       <div class="space-y-6">
-        <!-- Extraction Info Component -->
-        <ExtractionInfo
+        <!-- Profile Info Component (combines ExtractionInfo + ProfileSummary) -->
+        <ProfileInfo
+          profile={$extractedData?.profile}
           extractionInfo={$extractionInfo}
           ripUserId={$ripUserId}
           bind:showJsonData={$showJsonData}
@@ -186,9 +188,6 @@
               on:combinedCardsChanged={handleCombinedCardsChanged}
               on:cardsBySetChanged={handleCardsBySetChanged}
             />
-          
-            <!-- Profile Summary Component -->
-            <ProfileSummary profile={$extractedData.profile} />
 
             <!-- Collection Overview Component -->
             <CollectionOverview extractedData={$extractedData} setCardsData={$setCardsData} />
