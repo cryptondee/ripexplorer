@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import TradeTable from '$lib/components/TradeTable.svelte';
   import UserSearchInput from '$lib/components/UserSearchInput.svelte';
   import SetSummaryTable from '$lib/components/trade/SetSummaryTable.svelte';
@@ -36,6 +35,11 @@
   let userSummaryB: any[] = [];
   let summariesLoading = false;
   
+  // Card selection state
+  let enableCardSelection = false;
+  let selectedGiveCards: Set<string> = new Set();
+  let selectedReceiveCards: Set<string> = new Set();
+  
   // Computed sorted sets with completion rates
   $: sortedAvailableSets = [...availableSets].sort((a, b) => {
     // Get completion rates for User A (first user)
@@ -60,6 +64,74 @@
   function handleCardClick(trade: any) {
     if (trade && trade.card) {
       openCardModal(trade.card);
+    }
+  }
+  
+  // Handle card selection changes
+  function handleGiveCardSelection(event: CustomEvent<{ cardId: string; selected: boolean }>) {
+    const { cardId, selected } = event.detail;
+    if (selected) {
+      selectedGiveCards.add(cardId);
+    } else {
+      selectedGiveCards.delete(cardId);
+    }
+    selectedGiveCards = selectedGiveCards; // Trigger reactivity
+  }
+  
+  function handleReceiveCardSelection(event: CustomEvent<{ cardId: string; selected: boolean }>) {
+    const { cardId, selected } = event.detail;
+    if (selected) {
+      selectedReceiveCards.add(cardId);
+    } else {
+      selectedReceiveCards.delete(cardId);
+    }
+    selectedReceiveCards = selectedReceiveCards; // Trigger reactivity
+  }
+  
+  // Handle select all for give cards
+  function handleGiveSelectAll(event: CustomEvent<boolean>) {
+    const selectAll = event.detail;
+    const giveTrades = filteredTrades.filter(trade => trade.tradeType === 'give' || trade.tradeType === 'perfect');
+    
+    if (selectAll) {
+      giveTrades.forEach(trade => selectedGiveCards.add(trade.card.id));
+    } else {
+      giveTrades.forEach(trade => selectedGiveCards.delete(trade.card.id));
+    }
+    selectedGiveCards = selectedGiveCards; // Trigger reactivity
+  }
+  
+  // Handle select all for receive cards
+  function handleReceiveSelectAll(event: CustomEvent<boolean>) {
+    const selectAll = event.detail;
+    const receiveTrades = filteredTrades.filter(trade => trade.tradeType === 'receive' || trade.tradeType === 'perfect');
+    
+    if (selectAll) {
+      receiveTrades.forEach(trade => selectedReceiveCards.add(trade.card.id));
+    } else {
+      receiveTrades.forEach(trade => selectedReceiveCards.delete(trade.card.id));
+    }
+    selectedReceiveCards = selectedReceiveCards; // Trigger reactivity
+  }
+  
+  // Toggle card selection mode
+  function toggleCardSelection() {
+    enableCardSelection = !enableCardSelection;
+    if (!enableCardSelection) {
+      // Clear selections when disabling
+      selectedGiveCards.clear();
+      selectedReceiveCards.clear();
+      selectedGiveCards = selectedGiveCards;
+      selectedReceiveCards = selectedReceiveCards;
+    } else {
+      // Select all cards by default when enabling
+      const allGiveTrades = filteredTrades.filter(trade => trade.tradeType === 'give' || trade.tradeType === 'perfect');
+      const allReceiveTrades = filteredTrades.filter(trade => trade.tradeType === 'receive' || trade.tradeType === 'perfect');
+      
+      allGiveTrades.forEach(trade => selectedGiveCards.add(trade.card.id));
+      allReceiveTrades.forEach(trade => selectedReceiveCards.add(trade.card.id));
+      selectedGiveCards = selectedGiveCards;
+      selectedReceiveCards = selectedReceiveCards;
     }
   }
 
@@ -228,6 +300,13 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
       if (response.ok && data.success) {
         tradeResults = data;
         availableSets = data.availableSets || [];
+        
+        // Show cache status if data was cached
+        if (data.cached) {
+          console.log('📦 Trade data loaded from cache');
+        } else {
+          console.log('🌐 Trade data fetched fresh from rip.fun');
+        }
         
         // Extract available rarities from trade results
         const raritySet = new Set<string>();
@@ -422,7 +501,18 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
       <div class="space-y-12">
         <!-- User Summary -->
         <div class="bg-white rounded-lg shadow-md p-8">
-          <h2 class="text-xl font-bold mb-4">👥 User Comparison</h2>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold">👥 User Comparison</h2>
+            {#if tradeResults.cached}
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                📦 Cached data
+              </span>
+            {:else}
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                🌐 Fresh data
+              </span>
+            {/if}
+          </div>
           <div class="grid md:grid-cols-2 gap-8">
             <div class="text-center p-6 bg-blue-50 rounded-lg">
               <h3 class="text-lg font-semibold text-blue-900">{tradeResults.userA.username}</h3>
@@ -508,10 +598,42 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
             on:clearFilters={handleSetChange}
           />
 
+          <!-- Card Selection Toggle -->
+          <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">🎯 Customize Trade Analysis</h3>
+                <p class="text-sm text-gray-600 mt-1">Select specific cards to include in trade calculations</p>
+              </div>
+              <button
+                type="button"
+                on:click={toggleCardSelection}
+                class="px-4 py-2 rounded-lg font-medium transition-colors {enableCardSelection 
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}"
+              >
+                {enableCardSelection ? '✓ Selection Enabled' : '📝 Enable Selection'}
+              </button>
+            </div>
+            
+            {#if enableCardSelection}
+              <div class="mt-4 p-3 bg-indigo-50 rounded-lg">
+                <p class="text-sm text-indigo-800">
+                  <span class="font-medium">Selection Mode Active:</span> 
+                  Use checkboxes to select which cards to include in trades. 
+                  Deselected cards (grayed out) won't be included in trade calculations.
+                </p>
+              </div>
+            {/if}
+          </div>
+
           <!-- Filtered Trade Summary -->
           <FilteredTradeSummary
             {filteredTradeSummary}
             {showDuplicatesOnly}
+            enableSelection={enableCardSelection}
+            selectedGiveCards={selectedGiveCards}
+            selectedReceiveCards={selectedReceiveCards}
             on:copySummary={copyTradeSummary}
           />
 
@@ -539,7 +661,11 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
                   trades={giveTrades}
                   userCountField="userACount"
                   titleColor="text-orange-600"
+                  enableSelection={enableCardSelection}
+                  selectedCards={selectedGiveCards}
                   on:cardClick={(e) => handleCardClick(e.detail)}
+                  on:selectionChange={handleGiveCardSelection}
+                  on:selectAll={handleGiveSelectAll}
                 />
               {/if}
 
@@ -562,7 +688,11 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
                   trades={receiveTrades}
                   userCountField="userBCount"
                   titleColor="text-blue-600"
+                  enableSelection={enableCardSelection}
+                  selectedCards={selectedReceiveCards}
                   on:cardClick={(e) => handleCardClick(e.detail)}
+                  on:selectionChange={handleReceiveCardSelection}
+                  on:selectAll={handleReceiveSelectAll}
                 />
               {/if}
 

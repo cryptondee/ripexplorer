@@ -1,16 +1,44 @@
 import { json } from '@sveltejs/kit';
 import { tradeAnalyzer } from '$lib/server/services/tradeAnalyzer.js';
 import { extractUserProfile } from '$lib/server/logic/extraction.js';
+import { redisCache, CacheKeys } from '$lib/server/redis/client.js';
 import type { RequestHandler } from './$types.js';
 
 // Cache of setId -> Set of standardized card keys (matches TradeAnalyzer key format `card_<id>`)
 const setCardKeyCache: Map<string, Set<string>> = new Map();
 
-async function getUserProfileForTrade(input: string) {
+async function getUserProfileForTrade(input: string, forceRefresh: boolean = false) {
   console.log(`Extracting profile for: ${input}`);
+  
+  // Check cache first unless force refresh
+  if (!forceRefresh) {
+    const cacheKey = CacheKeys.extraction(input);
+    const cachedResult = await redisCache.get(cacheKey);
+    
+    if (cachedResult && cachedResult.extractedData) {
+      console.log(`🔴 Cache HIT for trade profile: ${input}`);
+      return {
+        username: cachedResult.username,
+        id: cachedResult.resolvedUserId,
+        profile: cachedResult.extractedData.profile,
+        cards: cachedResult.extractedData.profile?.digital_cards || [],
+        cached: true
+      };
+    }
+    console.log(`🔴 Cache MISS for trade profile: ${input}`);
+  }
   
   // Use the shared extraction logic directly (no HTTP overhead)
   const extractData = await extractUserProfile(input, { method: 'auto' });
+  
+  // Cache the extraction result for 1 hour
+  try {
+    const cacheKey = CacheKeys.extraction(input);
+    await redisCache.set(cacheKey, extractData, 3600);
+    console.log(`🔴 Cache STORED for trade profile: ${input}`);
+  } catch (cacheError) {
+    console.warn('Failed to cache trade profile:', cacheError);
+  }
   
   console.log(`Profile extracted for ${extractData.username}: ${extractData.extractedData.profile?.digital_cards?.length || 0} cards`);
   
@@ -18,12 +46,13 @@ async function getUserProfileForTrade(input: string) {
     username: extractData.username,
     id: extractData.resolvedUserId,
     profile: extractData.extractedData.profile,
-    cards: extractData.extractedData.profile?.digital_cards || []
+    cards: extractData.extractedData.profile?.digital_cards || [],
+    cached: false
   };
 }
 
 // Shared function to perform complete trade analysis for two users
-async function getTradeAnalysisForUsers(userA_input: string, userB_input: string, request: Request) {
+async function getTradeAnalysisForUsers(userA_input: string, userB_input: string, request: Request, forceRefresh: boolean = false) {
   if (!userA_input || !userB_input) {
     throw new Error('Both userA and userB are required');
   }
@@ -36,8 +65,8 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
   
   // Extract both user profiles in parallel using direct function calls
   const [profileA, profileB] = await Promise.all([
-    getUserProfileForTrade(userA_input),
-    getUserProfileForTrade(userB_input)
+    getUserProfileForTrade(userA_input, forceRefresh),
+    getUserProfileForTrade(userB_input, forceRefresh)
   ]);
   
   console.log(`Profile extraction complete:`);
@@ -148,10 +177,21 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { userA, userB } = await request.json();
+    const { userA, userB, forceRefresh = false } = await request.json();
+    
+    // Check if we have cached trade analysis for this pair
+    const tradeCacheKey = `trade_compare:${userA}:${userB}`;
+    if (!forceRefresh) {
+      const cachedTrade = await redisCache.get(tradeCacheKey);
+      if (cachedTrade) {
+        console.log(`🔴 Cache HIT for trade analysis: ${userA} vs ${userB}`);
+        return json({ ...cachedTrade, cached: true });
+      }
+      console.log(`🔴 Cache MISS for trade analysis: ${userA} vs ${userB}`);
+    }
     
     // Use the shared analysis function
-    const { tradeAnalysis, collectionA, collectionB, ownedBySetA, ownedBySetB, missingBySetA, missingBySetB } = await getTradeAnalysisForUsers(userA, userB, request);
+    const { tradeAnalysis, collectionA, collectionB, ownedBySetA, ownedBySetB, missingBySetA, missingBySetB } = await getTradeAnalysisForUsers(userA, userB, request, forceRefresh);
     
     // Get available sets for filtering
     const availableSets = tradeAnalyzer.getAvailableSets(collectionA, collectionB);
@@ -161,7 +201,7 @@ export const POST: RequestHandler = async ({ request }) => {
     
     console.log(`- Available sets: ${availableSets.length}`);
     
-    return json({
+    const responseData = {
       success: true,
       userA: {
         username: collectionA.username,
@@ -183,7 +223,20 @@ export const POST: RequestHandler = async ({ request }) => {
       availableSets,
       recommendations,
       timestamp: new Date().toISOString()
-    });
+    };
+    
+    // Cache the trade analysis for 30 minutes (unless it's a force refresh)
+    if (!forceRefresh) {
+      try {
+        const tradeCacheKey = `trade_compare:${userA}:${userB}`;
+        await redisCache.set(tradeCacheKey, responseData, 1800);
+        console.log(`🔴 Cache STORED for trade analysis: ${userA} vs ${userB}`);
+      } catch (cacheError) {
+        console.warn('Failed to cache trade analysis:', cacheError);
+      }
+    }
+    
+    return json(responseData);
     
   } catch (error) {
     console.error('Trade comparison failed:', error);

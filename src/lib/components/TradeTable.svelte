@@ -7,14 +7,33 @@
   export let userCountField: 'userACount' | 'userBCount';
   export let titleColor: string = 'text-gray-900';
   
+  // Card selection props
+  export let enableSelection: boolean = false;
+  export let selectedCards: Set<string> = new Set();
+  
   // Event dispatcher
   const dispatch = createEventDispatcher<{
     cardClick: any;
+    selectionChange: { cardId: string; selected: boolean };
+    selectAll: boolean;
   }>();
   
   function handleCardClick(trade: any) {
     dispatch('cardClick', trade);
   }
+  
+  function handleSelectionChange(trade: any, selected: boolean) {
+    dispatch('selectionChange', { cardId: trade.card.id, selected });
+  }
+  
+  function handleSelectAll(selectAll: boolean) {
+    dispatch('selectAll', selectAll);
+  }
+  
+  // Check if all visible cards are selected
+  $: allSelected = enableSelection && trades.length > 0 && trades.every(trade => selectedCards.has(trade.card.id));
+  $: someSelected = enableSelection && trades.some(trade => selectedCards.has(trade.card.id));
+  $: selectedCount = enableSelection ? trades.filter(trade => selectedCards.has(trade.card.id)).length : trades.length;
 
   function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('en-US', {
@@ -34,6 +53,13 @@
   }
 
   function getRowStyle(trade: any): string {
+    const isSelected = enableSelection ? selectedCards.has(trade.card.id) : true;
+    
+    // If card is deselected, gray it out
+    if (enableSelection && !isSelected) {
+      return 'background-color: #f9fafb; color: #9ca3af; opacity: 0.6;';
+    }
+    
     // Highlight rows based on card count for both give and receive trades
     const count = userCountField === 'userACount' ? trade.userACount : trade.userBCount;
     if ((trade.tradeType === 'give' || trade.tradeType === 'receive' || trade.tradeType === 'perfect') && count > 0) {
@@ -58,14 +84,46 @@
 </script>
 
 <div class="bg-white rounded-lg shadow-md p-8">
-  <h3 class="text-lg font-bold mb-4 {titleColor}">
-    {title} ({trades.length})
-  </h3>
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-lg font-bold {titleColor}">
+      {title} ({enableSelection ? selectedCount : trades.length}{#if enableSelection && selectedCount !== trades.length} of {trades.length}{/if})
+    </h3>
+    
+    {#if enableSelection && trades.length > 0}
+      <div class="flex items-center space-x-3 text-sm">
+        <button
+          type="button"
+          class="text-indigo-600 hover:text-indigo-500 font-medium"
+          on:click={() => handleSelectAll(true)}
+        >
+          Select All
+        </button>
+        <button
+          type="button"
+          class="text-gray-600 hover:text-gray-500 font-medium"
+          on:click={() => handleSelectAll(false)}
+        >
+          Clear All
+        </button>
+      </div>
+    {/if}
+  </div>
   
   <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
         <tr>
+          {#if enableSelection}
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
+              <input
+                type="checkbox"
+                class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                checked={allSelected}
+                indeterminate={someSelected && !allSelected}
+                on:change={(e) => handleSelectAll((e.target as HTMLInputElement).checked)}
+              />
+            </th>
+          {/if}
           <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card</th>
           <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Set</th>
           <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rarity</th>
@@ -80,6 +138,16 @@
             style="{getRowStyle(trade)}"
             on:click={() => handleCardClick(trade)}
           >
+            {#if enableSelection}
+              <td class="px-4 py-3 whitespace-nowrap w-10" on:click|stopPropagation>
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  checked={selectedCards.has(trade.card.id)}
+                  on:change={(e) => handleSelectionChange(trade, (e.target as HTMLInputElement).checked)}
+                />
+              </td>
+            {/if}
             <!-- Card -->
             <td class="px-4 py-3 whitespace-nowrap">
               <div class="flex items-center">
