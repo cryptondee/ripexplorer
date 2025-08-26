@@ -6,12 +6,22 @@ export function getSetNameFromCard(input: any, setCardsData?: any): string {
   
   // Extended known mappings for sets
   const knownSetNames: Record<string, string> = {
-    'sv3pt5': '151',
-    'sv8pt5': 'Surging Sparks', 
-    'zsv10pt5': 'Stellar Crown',
-    'rsv10pt5': 'Stellar Crown',
-    'sv4': 'Paradox Rift',
-    'sv5': 'Temporal Forces'
+    'zsv10pt5': 'Black Bolt',
+    'rsv10pt5': 'white flare',
+    'sv10': 'Destinied rivals',
+    'sv9': 'Journey togehter',
+    'sv8pt5': 'Prismatic Evolutions',
+    's8': 'Surging Sparks',
+    'sv6pt5': 'Shrouded Fable',
+    'sv7': 'Stellar Crown',
+    'sv3pt5': 'Pokemon 151',
+    'sv6': 'Twilight Masquerade',
+    'swsh12pt5': 'Crown Zenith',
+    'swsh7': 'Evolving Skies',
+    'swsh8': 'Fusion Strike',
+    'sv5': 'Temporal Forces',
+    'sv4pt5': 'Paldean fates',
+    'sv4': 'Paradox rift set',
   };
   if (setId && knownSetNames[setId]) return knownSetNames[setId];
 

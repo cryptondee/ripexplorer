@@ -30,43 +30,77 @@
     onlyMissingToggle: boolean;
     availableOnlyToggle: boolean;
     pageSizeChange: number;
+    filtersChanged: { 
+      searchTerm: string; 
+      selectedSet: string; 
+      selectedRarity: string; 
+      showMissingCards: boolean; 
+      onlyMissingCards: boolean; 
+      availableOnly: boolean;
+      pageSize: number;
+      resetPagination: boolean;
+    };
   }>();
 
+  // Internal filter change handlers with pagination reset logic
   function handleSearchInput(event: Event) {
     const target = event.target as HTMLInputElement;
     searchTerm = target.value;
     dispatch('searchChange', searchTerm);
+    dispatchFiltersChanged(true);
   }
 
   function handleSetChange() {
     dispatch('setChange', selectedSet);
+    dispatchFiltersChanged(true);
   }
 
   function handleRarityChange() {
     dispatch('rarityChange', selectedRarity);
+    dispatchFiltersChanged(true);
   }
 
   function handleViewModeChange(mode: 'grid' | 'table') {
     viewMode = mode;
     dispatch('viewModeChange', viewMode);
+    // View mode change doesn't reset pagination
+    dispatchFiltersChanged(false);
   }
 
   function handleMissingCardsChange() {
     if (showMissingCards) onlyMissingCards = false;
     dispatch('missingCardsToggle', showMissingCards);
+    dispatchFiltersChanged(true);
   }
 
   function handleOnlyMissingChange() {
     if (onlyMissingCards) showMissingCards = false;
     dispatch('onlyMissingToggle', onlyMissingCards);
+    dispatchFiltersChanged(true);
   }
 
   function handleAvailableOnlyChange() {
     dispatch('availableOnlyToggle', availableOnly);
+    dispatchFiltersChanged(true);
   }
 
   function handlePageSizeChange() {
     dispatch('pageSizeChange', pageSize);
+    dispatchFiltersChanged(true);
+  }
+
+  // Centralized filter change dispatcher with pagination reset logic
+  function dispatchFiltersChanged(resetPagination: boolean) {
+    dispatch('filtersChanged', {
+      searchTerm,
+      selectedSet,
+      selectedRarity,
+      showMissingCards,
+      onlyMissingCards,
+      availableOnly,
+      pageSize,
+      resetPagination
+    });
   }
 
   // Helper to check if set-specific features should be shown

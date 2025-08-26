@@ -1,38 +1,131 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   
-  // Props
-  export let ripUserId: string = '';
-  export let searchResults: any[] = [];
-  export let showSearchResults: boolean = false;
-  export let searchLoading: boolean = false;
-  export let syncStatus: any = null;
-  export let syncLoading: boolean = false;
-  export let loading: boolean = false;
+  // Props - Simplified interface using Svelte 5 runes
+  let {
+    selectedUserId = $bindable(''),
+    disabled = false
+  }: {
+    selectedUserId?: string;
+    disabled?: boolean;
+  } = $props();
   
-  // Event dispatcher
+  // Internal state - Component owns this data
+  let searchResults: any[] = $state([]);
+  let showSearchResults: boolean = $state(false);
+  let searchLoading: boolean = $state(false);
+  let syncStatus: any = $state(null);
+  let syncLoading: boolean = $state(false);
+  let searchTimeout: ReturnType<typeof setTimeout>;
+  
+  // Event dispatcher - Simplified events
   const dispatch = createEventDispatcher<{
-    userInput: void;
-    selectUser: any;
-    hideSearchResults: void;
-    triggerSync: void;
+    userSelected: { username: string; userId: string };
+    syncComplete: any;
   }>();
   
+  // Internal search logic (moved from page)
   function handleUserInput() {
-    dispatch('userInput');
+    clearTimeout(searchTimeout);
+    
+    if (selectedUserId.trim().length < 2) {
+      searchResults = [];
+      showSearchResults = false;
+      return;
+    }
+    
+    searchTimeout = setTimeout(async () => {
+      await searchUsers(selectedUserId.trim());
+    }, 300);
   }
   
+  // Internal user search (moved from page)
+  async function searchUsers(query: string) {
+    try {
+      searchLoading = true;
+      const response = await fetch(`/api/search-users?q=${encodeURIComponent(query)}&limit=5`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        searchResults = data.results;
+        showSearchResults = true;
+      } else {
+        searchResults = [];
+        showSearchResults = false;
+      }
+    } catch (err) {
+      console.warn('User search failed:', err);
+      searchResults = [];
+      showSearchResults = false;
+    } finally {
+      searchLoading = false;
+    }
+  }
+  
+  // Internal user selection (moved from page)
   function selectUser(user: any) {
-    dispatch('selectUser', user);
+    selectedUserId = user.username;
+    showSearchResults = false;
+    searchResults = [];
+    
+    // Dispatch simplified event
+    dispatch('userSelected', {
+      username: user.username,
+      userId: user.id
+    });
   }
   
+  // Internal hide results (moved from page)
   function hideSearchResults() {
-    dispatch('hideSearchResults');
+    setTimeout(() => {
+      showSearchResults = false;
+    }, 200);
   }
   
-  function triggerSync() {
-    dispatch('triggerSync');
+  // Internal sync functionality (moved from page)
+  async function triggerSync() {
+    try {
+      syncLoading = true;
+      const response = await fetch('/api/sync-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Sync started:', data);
+        await checkSyncStatus();
+        dispatch('syncComplete', data);
+      } else {
+        const errorData = await response.json();
+        console.error('Sync failed:', errorData);
+      }
+    } catch (err) {
+      console.error('Sync request failed:', err);
+    } finally {
+      syncLoading = false;
+    }
   }
+  
+  // Internal sync status check (moved from page)
+  async function checkSyncStatus() {
+    try {
+      const response = await fetch('/api/sync-users');
+      if (response.ok) {
+        const data = await response.json();
+        syncStatus = data;
+      }
+    } catch (err) {
+      console.warn('Failed to check sync status:', err);
+    }
+  }
+  
+  // Check sync status on component mount
+  $effect(() => {
+    checkSyncStatus();
+  });
 </script>
 
 <div class="relative">
@@ -46,10 +139,11 @@
     <input
       type="search"
       id="ripUserId"
-      bind:value={ripUserId}
+      bind:value={selectedUserId}
       oninput={handleUserInput}
       onblur={hideSearchResults}
-      class="block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+      {disabled}
+      class="block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
       placeholder="Enter user (e.g., Poketard) or ID (e.g., 2010)"
       autocomplete="off"
       aria-label="Search for rip.fun user"
@@ -119,7 +213,7 @@
       {/if}
       <button
         onclick={triggerSync}
-        disabled={syncLoading || loading}
+        disabled={syncLoading || disabled}
         class="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
         title="Sync blockchain data to update user database"
       >

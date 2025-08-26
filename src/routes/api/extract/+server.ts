@@ -5,7 +5,7 @@ import type { RequestHandler } from './$types.js';
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { username, method = 'auto', forceRefresh = false } = await request.json();
+    const { username, forceRefresh = false } = await request.json();
     
     if (!username) {
       return json({ error: 'Username is required' }, { status: 400 });
@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     
     // Use the shared extraction logic
-    const responseData = await extractUserProfile(trimmedInput, { method });
+    const responseData = await extractUserProfile(trimmedInput, {});
     
     // Cache successful extraction for 1 hour (3600 seconds)
     try {

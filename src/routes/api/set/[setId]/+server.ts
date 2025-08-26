@@ -4,6 +4,9 @@ import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, url }) => {
   const { setId } = params;
+  const requestId = Math.random().toString(36).substring(2, 8);
+  
+  console.log(`📥 API[${requestId}]: Received request for set ${setId}`);
   
   if (!setId) {
     return json({ error: 'Set ID is required' }, { status: 400 });
@@ -14,14 +17,14 @@ export const GET: RequestHandler = async ({ params, url }) => {
   const cachedData = await redisCache.get(cacheKey);
   
   if (cachedData) {
-    console.log(`🔴 Cache HIT for set data: ${setId}`);
+    console.log(`🔴 API[${requestId}]: Cache HIT for set data: ${setId}`);
     return json({
       ...cachedData,
       cached: true
     });
   }
   
-  console.log(`🔴 Cache MISS for set data: ${setId}`);
+  console.log(`🔴 API[${requestId}]: Cache MISS for set data: ${setId}`);
 
   try {
     // Get query parameters from the request
