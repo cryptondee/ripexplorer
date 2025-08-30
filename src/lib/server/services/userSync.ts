@@ -19,7 +19,16 @@ export class UserSyncService {
    */
   async fetchRipFunUserByAddress(address: string): Promise<RipFunUserData | null> {
     try {
-      const response = await fetch(`https://www.rip.fun/api/auth/${address}`, {
+      // Convert to EIP-55 checksum format for rip.fun API compatibility
+      let checksumAddress = address;
+      try {
+        const { getAddress } = await import('viem');
+        checksumAddress = getAddress(address);
+      } catch (error) {
+        console.warn('Failed to convert to checksum address:', address, error);
+      }
+      
+      const response = await fetch(`https://rip.fun/api/auth/${checksumAddress}`, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           'Accept': 'application/json',

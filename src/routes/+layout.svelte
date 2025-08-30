@@ -21,6 +21,7 @@
 					<a href="/" class="text-gray-600 hover:text-gray-900">Home</a>
 					<a href="/extract" class="text-gray-600 hover:text-gray-900">Extractor</a>
 					<a href="/trade-finder" class="text-gray-600 hover:text-gray-900">Trade Finder</a>
+					<a href="/sales" class="text-gray-600 hover:text-gray-900">Sales</a>
 				</div>
 			</div>
 		</div>

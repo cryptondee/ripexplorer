@@ -48,3 +48,40 @@ model SyncStatus {
   
   @@map("sync_status")
 }
+
+model SalesEvent {
+  id              String   @id @default(cuid())
+  transactionHash String   
+  blockNumber     BigInt
+  logIndex        Int
+  buyerAddress    String   // from topic1 (indexed)
+  sellerAddress   String   // from topic2 (indexed)  
+  nftContract     String   // from topic3 (indexed)
+  tokenId         String   // from event data
+  price           String   // Wei as string
+  currency        String   // currency contract address
+  
+  // Card metadata (enriched from tokenURI)
+  cardName        String?  // "Plusle"
+  cardImage       String?  // "cards/sv4/CARD-RIP1XP7EYGDGKE80_1752702477766.png"
+  cardUniqueId    String?  // "CARD-RIP1XP7EYGDGKE80"  
+  cardRarity      String?  // "Common"
+  cardSet         String?  // "Paradox Rift"
+  packetId        String?  // "4553"
+  
+  // Username mappings (from existing userSync data)
+  buyerUsername   String?
+  sellerUsername  String?
+  
+  timestamp       DateTime @default(now())
+
+  // Composite unique constraint for bulk purchases (same transaction, different logIndex)
+  @@unique([transactionHash, logIndex])
+  
+  // Indexes for efficient queries
+  @@index([timestamp])
+  @@index([buyerAddress])
+  @@index([sellerAddress])
+  @@index([cardSet])
+  @@map("sales_events")
+}
