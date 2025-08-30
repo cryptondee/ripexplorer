@@ -68,6 +68,7 @@
   // State managed by SetDataManager component
   let combinedCards: any[] = $state([]);
   let cardsBySet: any = $state({});
+  let loadingMissingCards = $state(false);
   
   // Event handlers for SetDataManager
   function handleSetDataLoaded(event: CustomEvent) {
@@ -184,6 +185,7 @@
               bind:setDataErrors={$setDataErrors}
               bind:fetchingAllSets={$fetchingAllSets}
               bind:bulkFetchErrors={$bulkFetchErrors}
+              bind:loadingMissingCards
               on:dataLoaded={handleSetDataLoaded}
               on:combinedCardsChanged={handleCombinedCardsChanged}
               on:cardsBySetChanged={handleCardsBySetChanged}
@@ -212,6 +214,7 @@
                   loadingSetData={$loadingSetData}
                   setDataErrors={$setDataErrors}
                   bulkFetchErrors={$bulkFetchErrors}
+                  loadingMissingCards={loadingMissingCards}
                   on:filtersChanged={handleFiltersChanged}
                 />
                 

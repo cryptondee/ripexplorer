@@ -15,7 +15,8 @@
     loadingSetData = $bindable({}),
     setDataErrors = $bindable({}),
     fetchingAllSets = $bindable(false),
-    bulkFetchErrors = $bindable([])
+    bulkFetchErrors = $bindable([]),
+    loadingMissingCards = $bindable(false)
   }: {
     extractedData?: any;
     selectedSet?: string;
@@ -27,11 +28,14 @@
     setDataErrors?: any;
     fetchingAllSets?: boolean;
     bulkFetchErrors?: any[];
+    loadingMissingCards?: boolean;
   } = $props();
 
   // Internal state for missing cards
   let missingCardsWithListings: any[] = $state([]);
-  let loadingMissingCards = $state(false);
+  
+  // Cache for missing cards by set ID to avoid re-fetching
+  let missingCardsCache: Record<string, any[]> = {};
 
   // Request deduplication now handled by dedicated utility module
   
@@ -98,22 +102,41 @@
   }
 
   // Function to get missing cards for a specific set (moved from page)
-  async function getMissingCards(setId: string, userCards: any[]) {
+  async function getMissingCards(setId: string, userCards: any[], skipListings: boolean = false) {
     try {
+      // Create a cache key based on setId and user cards
+      const userCardIds = new Set(userCards.map(card => card.card?.id).filter(Boolean));
+      const cacheKey = `${setId}_${Array.from(userCardIds).sort().join(',')}`;
+      
+      // Check cache first
+      if (missingCardsCache[cacheKey] && !skipListings) {
+        console.log(`✨ SetDataManager: Using cached missing cards for set ${setId}`);
+        return missingCardsCache[cacheKey];
+      }
+      
       const completeSetData = await fetchCompleteSetData(setId);
       
       if (!completeSetData?.cards) {
         return [];
       }
-
-      // Get all card IDs that the user owns from this set
-      const userCardIds = new Set(userCards.map(card => card.card?.id).filter(Boolean));
       
       // Find cards from the complete set that the user doesn't have
       // Note: Complete set cards have ID at root level, user cards have nested structure
       const missingCards = completeSetData.cards.filter((setCard: any) => {
         return setCard.id && !userCardIds.has(setCard.id);
       });
+
+      // If we're skipping listings (for quick toggle), return cards without listing data
+      if (skipListings) {
+        return missingCards.map((card: any) => ({
+          card: card,
+          isMissing: true,
+          is_listed: false,
+          listing: null,
+          lowestPrice: null,
+          marketValue: card.market_price || card.raw_price
+        }));
+      }
 
       // Transform missing cards and fetch listing data for each
       const missingCardsWithListings = await Promise.all(
@@ -155,6 +178,10 @@
           };
         })
       );
+      
+      // Cache the result
+      missingCardsCache[cacheKey] = missingCardsWithListings;
+      console.log(`💾 SetDataManager: Cached ${missingCardsWithListings.length} missing cards for set ${setId}`);
       
       return missingCardsWithListings;
     } catch (err) {
@@ -229,7 +256,9 @@
   }
 
   // Function to fetch missing cards with marketplace data (moved from page)
-  async function fetchMissingCardsWithMarketplaceData(selectedSetValue: string) {
+  async function fetchMissingCardsWithMarketplaceData(selectedSetValue: string, forceRefresh: boolean = false) {
+    console.log(`🎯 SetDataManager: fetchMissingCardsWithMarketplaceData called for set: ${selectedSetValue}`);
+    
     if (selectedSetValue === 'all') {
       missingCardsWithListings = [];
       return;
@@ -239,17 +268,45 @@
       getSetNameFromCard(card, setCardsData) === selectedSetValue
     ) || [];
     
+    console.log(`🎯 SetDataManager: Found ${userCardsForSet.length} user cards for set ${selectedSetValue}`);
+    
     const setId = userCardsForSet[0]?.card?.set_id;
     
-    if (!setId || !setCardsData[setId]) {
+    if (!setId) {
+      console.log(`❌ SetDataManager: No setId found for ${selectedSetValue}`);
       missingCardsWithListings = [];
       return;
+    }
+
+    // Check if we already have cached missing cards for this set
+    const userCardIds = new Set(userCardsForSet.map(card => card.card?.id).filter(Boolean));
+    const cacheKey = `${setId}_${Array.from(userCardIds).sort().join(',')}`;
+    
+    if (!forceRefresh && missingCardsCache[cacheKey]) {
+      console.log(`🚀 SetDataManager: Using cached missing cards for instant display`);
+      missingCardsWithListings = missingCardsCache[cacheKey];
+      return;
+    }
+
+    console.log(`🎯 SetDataManager: Set ID is ${setId}`);
+
+    // Ensure we have the complete set data before checking for missing cards
+    if (!setCardsData[setId]) {
+      console.log(`📥 SetDataManager: Fetching complete set data for ${setId} before checking missing cards`);
+      try {
+        await fetchCompleteSetData(setId);
+      } catch (err) {
+        console.error(`Failed to fetch complete set data for ${setId}:`, err);
+        missingCardsWithListings = [];
+        return;
+      }
     }
 
     loadingMissingCards = true;
     try {
       const result = await getMissingCards(setId, userCardsForSet);
       missingCardsWithListings = result;
+      console.log(`✅ SetDataManager: Got ${result.length} missing cards for set ${setId}`);
     } catch (err) {
       console.error('Error fetching missing cards with marketplace data:', err);
       missingCardsWithListings = [];
@@ -270,11 +327,27 @@
     return Array.from(unique.values());
   }
 
+  // Track previous selectedSet to detect changes
+  let previousSelectedSet = $state(selectedSet);
+  
   // Watch for changes to selectedSet and fetch missing cards when needed
   $effect(() => {
     // Only run on the client side to prevent SSR duplicate requests
-    if (browser && (showMissingCards || onlyMissingCards)) {
-      fetchMissingCardsWithMarketplaceData(selectedSet);
+    if (browser) {
+      // Check if set changed - if so, we might need to clear cache for a fresh fetch
+      const setChanged = previousSelectedSet !== selectedSet;
+      if (setChanged) {
+        console.log(`📍 SetDataManager: Set changed from ${previousSelectedSet} to ${selectedSet}`);
+        previousSelectedSet = selectedSet;
+      }
+      
+      if (showMissingCards || onlyMissingCards) {
+        // Use cached data for same set, force refresh only if set changed
+        fetchMissingCardsWithMarketplaceData(selectedSet, false);
+      } else {
+        // Clear missing cards when both flags are turned off
+        missingCardsWithListings = [];
+      }
     }
   });
 
@@ -296,12 +369,16 @@
     // Start with deduplicated user cards
     let cards = deduplicateCards([...extractedData.profile.digital_cards]);
     
+    console.log(`🔍 SetDataManager: combinedCards derived - selectedSet: ${selectedSet}, showMissingCards: ${showMissingCards}, onlyMissingCards: ${onlyMissingCards}, missingCardsWithListings.length: ${missingCardsWithListings.length}`);
+    
     // Add missing cards if enabled for specific set
     if (selectedSet !== 'all' && (showMissingCards || onlyMissingCards)) {
       if (onlyMissingCards) {
         cards = missingCardsWithListings;
+        console.log(`🔍 SetDataManager: Using only missing cards (${missingCardsWithListings.length} cards)`);
       } else if (showMissingCards) {
         cards = [...cards, ...missingCardsWithListings];
+        console.log(`🔍 SetDataManager: Adding missing cards to user cards (${cards.length} total cards)`);
       }
     }
     

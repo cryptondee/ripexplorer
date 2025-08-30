@@ -121,7 +121,19 @@
   
   // Process cards to add quantity information
   const cardsWithQuantity = $derived.by(() => {
-    let cards = selectedSet === 'all' ? combinedCards : (cardsBySet[selectedSet]?.cards || []);
+    // Always use combinedCards as the source since it already includes missing cards when enabled
+    let cards = combinedCards;
+    
+    console.log(`📊 CardDisplay: Starting with ${combinedCards.length} combined cards`);
+    
+    // If a specific set is selected, filter to that set
+    if (selectedSet !== 'all') {
+      cards = combinedCards.filter((card: any) => {
+        const setName = getSetNameFromCard(card, setCardsData);
+        return setName === selectedSet;
+      });
+      console.log(`📊 CardDisplay: After filtering to set "${selectedSet}", have ${cards.length} cards`);
+    }
     
     // Group cards by unique identifier to calculate quantities
     const cardGroups: { [key: string]: any[] } = {};

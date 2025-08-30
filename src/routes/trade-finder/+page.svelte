@@ -195,18 +195,40 @@
 
   // Copy trade summary to clipboard
   function copyTradeSummary() {
+    // Use selected cards when selection is enabled, otherwise use all cards
+    let giveTradesToCopy = filteredTradeSummary.giveTrades;
+    let receiveTradesToCopy = filteredTradeSummary.receiveTrades;
+    
+    if (enableCardSelection) {
+      // Filter to only include selected cards
+      giveTradesToCopy = filteredTradeSummary.giveTrades.filter(trade => selectedGiveCards.has(trade.card.id));
+      receiveTradesToCopy = filteredTradeSummary.receiveTrades.filter(trade => selectedReceiveCards.has(trade.card.id));
+    }
+    
+    // Calculate values for selected/filtered trades
+    const giveValue = giveTradesToCopy.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0);
+    const receiveValue = receiveTradesToCopy.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0);
+    
+    // Create card lists for selected/filtered trades
+    const giveCardsList = giveTradesToCopy.map(trade => 
+      `${trade.card.name} (#${trade.card.card_number}) [${getFoilTypeWithIcon(trade.card)}] - $${(trade.estimatedValue || 0).toFixed(2)}`
+    );
+    const receiveCardsList = receiveTradesToCopy.map(trade => 
+      `${trade.card.name} (#${trade.card.card_number}) [${getFoilTypeWithIcon(trade.card)}] - $${(trade.estimatedValue || 0).toFixed(2)}`
+    );
+    
     const summary = `
-TRADE SUMMARY ${showDuplicatesOnly ? '(Duplicates Only)' : ''}
+TRADE SUMMARY ${showDuplicatesOnly ? '(Duplicates Only)' : ''}${enableCardSelection ? ' (Selected Cards Only)' : ''}
 Set: ${selectedSet === 'all' ? 'All Sets' : sortedAvailableSets.find(s => s.id === selectedSet)?.name || selectedSet}
 ${selectedRarity !== 'all' ? `Rarity: ${selectedRarity}` : ''}
 
-${tradeResults.userA.username} CAN GIVE (${filteredTradeSummary.giveTrades.length} cards - $${filteredTradeSummary.giveValue.toFixed(2)}):
-${filteredTradeSummary.giveCardsList.join('\n')}
+${tradeResults.userA.username} CAN GIVE (${giveTradesToCopy.length} cards - $${giveValue.toFixed(2)}):
+${giveCardsList.join('\n')}
 
-${tradeResults.userA.username} CAN RECEIVE (${filteredTradeSummary.receiveTrades.length} cards - $${filteredTradeSummary.receiveValue.toFixed(2)}):
-${filteredTradeSummary.receiveCardsList.join('\n')}
+${tradeResults.userA.username} CAN RECEIVE (${receiveTradesToCopy.length} cards - $${receiveValue.toFixed(2)}):
+${receiveCardsList.join('\n')}
 
-TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveValue ? '+' : ''}$${(filteredTradeSummary.receiveValue - filteredTradeSummary.giveValue).toFixed(2)} (${tradeResults.userA.username} perspective)
+TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValue).toFixed(2)} (${tradeResults.userA.username} perspective)
     `.trim();
 
     navigator.clipboard.writeText(summary).then(() => {
@@ -683,6 +705,11 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
                 }
                 
                 return true;
+              }).sort((a, b) => {
+                // Sort by card number numerically
+                const numA = parseInt(a.card.card_number || '0', 10);
+                const numB = parseInt(b.card.card_number || '0', 10);
+                return numA - numB;
               })}
               {#if giveTrades.length > 0}
                 <TradeTable
@@ -710,6 +737,11 @@ TRADE BALANCE: ${filteredTradeSummary.receiveValue > filteredTradeSummary.giveVa
                 }
                 
                 return true;
+              }).sort((a, b) => {
+                // Sort by card number numerically
+                const numA = parseInt(a.card.card_number || '0', 10);
+                const numB = parseInt(b.card.card_number || '0', 10);
+                return numA - numB;
               })}
               {#if receiveTrades.length > 0}
                 <TradeTable
