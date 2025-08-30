@@ -173,11 +173,12 @@
     <div class="flex flex-col lg:flex-row gap-4 items-start">
       <!-- View Mode Toggle -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
+        <label for="view-mode-toggle" class="block text-sm font-medium text-gray-700 mb-1">
           View Mode
         </label>
-        <div class="flex rounded-lg border border-gray-300 overflow-hidden">
+        <div class="flex rounded-lg border border-gray-300 overflow-hidden" role="group" aria-labelledby="view-mode-toggle">
           <button
+            id="view-mode-toggle"
             type="button"
             on:click={() => handleViewModeChange('grid')}
             class="px-3 py-2 text-sm font-medium {viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"

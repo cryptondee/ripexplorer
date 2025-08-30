@@ -109,25 +109,29 @@
 
     <!-- Price Range -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">
+      <label for="price-range-min" class="block text-sm font-medium text-gray-700 mb-2">
         Price Range (USDC)
       </label>
       <div class="grid grid-cols-2 gap-2">
         <input
+          id="price-range-min"
           type="number"
           bind:value={minPrice}
           placeholder="Min"
           step="0.01"
           class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           disabled={loading}
+          aria-label="Minimum price"
         />
         <input
+          id="price-range-max"
           type="number"
           bind:value={maxPrice}
           placeholder="Max"
           step="0.01"
           class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           disabled={loading}
+          aria-label="Maximum price"
         />
       </div>
     </div>

@@ -78,8 +78,22 @@
 </script>
 
 {#if $isCardModalOpen && $selectedCard}
-  <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" onclick={closeCardModal}>
-    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white" onclick={(e) => e.stopPropagation()}>
+  <div 
+    class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" 
+    onclick={closeCardModal}
+    onkeydown={(e) => e.key === 'Escape' && closeCardModal()}
+    role="button"
+    tabindex="0"
+    aria-label="Close modal"
+  >
+    <div 
+      class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white" 
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
       <!-- Modal Header -->
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold text-gray-900">

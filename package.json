@@ -3,6 +3,9 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"engines": {
+		"node": ">=20.19.0"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"dev:redis": "docker-compose up -d redis && npm run dev",
@@ -25,7 +28,9 @@
 		"@types/ws": "^8.18.1",
 		"alchemy-sdk": "^3.6.3",
 		"autoprefixer": "^10.4.16",
+		"bcrypt": "^5.1.1",
 		"ioredis": "^5.7.0",
+		"jsonwebtoken": "^9.0.2",
 		"postcss": "^8.4.31",
 		"tailwindcss": "^3.4.0",
 		"viem": "^2.34.0",
@@ -36,6 +41,8 @@
 		"@sveltejs/kit": "^2.22.0",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
 		"@tailwindcss/typography": "^0.5.10",
+		"@types/bcrypt": "^5.0.2",
+		"@types/jsonwebtoken": "^9.0.7",
 		"@types/node": "^24.3.0",
 		"prisma": "^5.22.0",
 		"svelte": "^5.0.0",
