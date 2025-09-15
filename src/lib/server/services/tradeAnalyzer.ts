@@ -376,6 +376,64 @@ export class TradeAnalyzer {
   }
 
   /**
+   * Filter trade analysis for cross-set trading
+   * Allows User A to trade cards from setA and User B to trade cards from setB
+   */
+  filterByCrossSets(analysis: TradeAnalysis, setA?: string, setB?: string): TradeAnalysis {
+    if ((!setA || setA === 'all') && (!setB || setB === 'all')) {
+      return analysis;
+    }
+    
+    // For cross-set trading:
+    // - userACanGive: cards from setA that user A has and user B needs
+    // - userACanReceive: cards from setB that user B has and user A needs
+    // - perfectTrades: intersection where A has setB cards B needs AND B has setA cards A needs
+    
+    const filterGiveTrades = (trades: TradeMatch[]) => {
+      if (!setA || setA === 'all') return trades;
+      return trades.filter(trade => trade.card.set_id === setA);
+    };
+    
+    const filterReceiveTrades = (trades: TradeMatch[]) => {
+      if (!setB || setB === 'all') return trades;
+      return trades.filter(trade => trade.card.set_id === setB);
+    };
+    
+    // Perfect trades need special handling - both conditions must be met
+    const filterPerfectTrades = (trades: TradeMatch[]) => {
+      return trades.filter(trade => {
+        // For perfect trades in cross-set mode, we need cards that exist in both sets
+        // or we allow perfect trades within either set
+        const inSetA = !setA || setA === 'all' || trade.card.set_id === setA;
+        const inSetB = !setB || setB === 'all' || trade.card.set_id === setB;
+        return inSetA || inSetB;
+      });
+    };
+    
+    const filteredGive = filterGiveTrades(analysis.userACanGive);
+    const filteredReceive = filterReceiveTrades(analysis.userACanReceive);
+    const filteredPerfect = filterPerfectTrades(analysis.perfectTrades);
+    
+    return {
+      ...analysis,
+      perfectTrades: filteredPerfect,
+      userACanReceive: filteredReceive,
+      userACanGive: filteredGive,
+      mutualMissing: analysis.mutualMissing, // Keep all mutual missing
+      summary: {
+        totalPerfectTrades: filteredPerfect.length,
+        totalOneWayToA: filteredReceive.length,
+        totalOneWayToB: filteredGive.length,
+        totalImpossible: analysis.mutualMissing.length,
+        estimatedPerfectTradeValue: filteredPerfect.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0),
+        estimatedOneWayToAValue: filteredReceive.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0),
+        estimatedOneWayToBValue: filteredGive.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0),
+        tradeBalance: 'even' as 'even' | 'favors_a' | 'favors_b'
+      }
+    };
+  }
+
+  /**
    * Generate trade recommendations based on analysis
    */
   generateTradeRecommendations(analysis: TradeAnalysis, userA: UserCardCollection, userB: UserCardCollection): string[] {

@@ -83,7 +83,7 @@
   }
 </script>
 
-<div class="bg-white rounded-lg shadow-md p-8">
+<div class="bg-white rounded-lg shadow-md p-6">
   <div class="flex items-center justify-between mb-4">
     <h3 class="text-lg font-bold {titleColor}">
       {title} ({enableSelection ? selectedCount : trades.length}{#if enableSelection && selectedCount !== trades.length} of {trades.length}{/if})

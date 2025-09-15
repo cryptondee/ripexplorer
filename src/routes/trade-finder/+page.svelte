@@ -19,6 +19,9 @@
 
   // Filtering and pagination
   let selectedSet = 'all';
+  let selectedSetA = 'all';  // New: Set for User A in cross-set mode
+  let selectedSetB = 'all';  // New: Set for User B in cross-set mode
+  let enableCrossSetTrading = false;  // New: Toggle for cross-set trading
   let selectedRarity = 'all';
   let selectedTradeType = 'all';
   let showDuplicatesOnly = false;
@@ -426,10 +429,18 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
       const params = new URLSearchParams({
         userA,
         userB,
-        set: selectedSet,
         page: currentPage.toString(),
         limit: itemsPerPage.toString()
       });
+
+      // Add set parameters based on mode
+      if (enableCrossSetTrading) {
+        params.append('setA', selectedSetA);
+        params.append('setB', selectedSetB);
+        params.append('crossSet', 'true');
+      } else {
+        params.append('set', selectedSet);
+      }
 
       const response = await fetch(`/api/trade-compare?${params}`);
       const data = await response.json();
@@ -463,6 +474,21 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
     await loadFilteredTrades();
   }
 
+  async function handleSetAChange(): Promise<void> {
+    currentPage = 1; // Reset to first page
+    await loadFilteredTrades();
+  }
+
+  async function handleSetBChange(): Promise<void> {
+    currentPage = 1; // Reset to first page
+    await loadFilteredTrades();
+  }
+
+  async function handleCrossSetToggle(): Promise<void> {
+    currentPage = 1; // Reset to first page
+    await loadFilteredTrades();
+  }
+
   async function handleRarityChange(): Promise<void> {
     currentPage = 1; // Reset to first page
     await loadFilteredTrades();
@@ -489,8 +515,8 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
   <title>Trade Finder - rip.fun Data Extractor</title>
 </svelte:head>
 
-<div class="min-h-[90vh] container mx-auto px-6 py-12">
-  <div class="max-w-[1400px] mx-auto">
+<div class="min-h-[90vh] px-6 py-12">
+  <div class="max-w-[90%] mx-auto">
     <!-- Header -->
     <div class="text-center mb-12">
       <h1 class="text-3xl font-bold text-gray-900 mb-4">🔄 Trade Finder</h1>
@@ -636,16 +662,24 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
           <!-- Filters -->
           <TradeFilters
             bind:selectedSet
+            bind:selectedSetA
+            bind:selectedSetB
             bind:selectedRarity
             bind:selectedTradeType
             bind:showDuplicatesOnly
+            bind:enableCrossSetTrading
             {sortedAvailableSets}
             {availableRarities}
+            userA={tradeResults.userA}
+            userB={tradeResults.userB}
             {getSetCompletion}
             on:setChange={handleSetChange}
+            on:setAChange={handleSetAChange}
+            on:setBChange={handleSetBChange}
             on:rarityChange={handleRarityChange}
             on:tradeTypeChange={handleTradeTypeChange}
             on:duplicatesToggle={handleSetChange}
+            on:crossSetToggle={handleCrossSetToggle}
             on:clearFilters={handleSetChange}
           />
 
@@ -689,7 +723,7 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
           />
 
           <!-- Two Tables Side by Side -->
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-12">
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
             {#if filteredTrades.length > 0}
               <!-- Note: tradeType 'give' means userA can give to userB, 'receive' means userA can receive from userB -->
               <!-- This is consistent regardless of which user is entered first in the form -->

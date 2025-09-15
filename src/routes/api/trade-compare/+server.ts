@@ -256,6 +256,9 @@ export const GET: RequestHandler = async ({ url, request }) => {
     const userA = url.searchParams.get('userA');
     const userB = url.searchParams.get('userB');
     const setId = url.searchParams.get('set');
+    const setA = url.searchParams.get('setA');
+    const setB = url.searchParams.get('setB');
+    const crossSet = url.searchParams.get('crossSet') === 'true';
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '50');
     
@@ -265,8 +268,12 @@ export const GET: RequestHandler = async ({ url, request }) => {
     // Get available sets (needed for frontend)
     const availableSets = tradeAnalyzer.getAvailableSets(collectionA, collectionB);
     
-    // Filter by set if specified
-    if (setId && setId !== 'all') {
+    // Filter by set(s) based on mode
+    if (crossSet) {
+      // Cross-set trading mode - filter by different sets for each user
+      tradeAnalysis = tradeAnalyzer.filterByCrossSets(tradeAnalysis, setA, setB);
+    } else if (setId && setId !== 'all') {
+      // Single set mode - filter by same set for both users
       tradeAnalysis = tradeAnalyzer.filterBySet(tradeAnalysis, setId);
     }
     
