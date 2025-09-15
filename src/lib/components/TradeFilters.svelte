@@ -56,9 +56,10 @@
   }
 
   function handleCrossSetToggle() {
-    enableCrossSetTrading = !enableCrossSetTrading;
+    // The checkbox binding will update enableCrossSetTrading automatically
+    // We just need to handle the side effects
     if (!enableCrossSetTrading) {
-      // Reset to single set mode
+      // When disabling cross-set mode, reset to single set mode
       selectedSetA = 'all';
       selectedSetB = 'all';
     }
@@ -86,7 +87,16 @@
       <input
         type="checkbox"
         bind:checked={enableCrossSetTrading}
-        on:change={handleCrossSetToggle}
+        on:change={() => {
+          // At this point, enableCrossSetTrading has been updated by bind:checked
+          if (!enableCrossSetTrading) {
+            // Just disabled cross-set trading, reset to single set mode
+            selectedSetA = 'all';
+            selectedSetB = 'all';
+          }
+          // When enabling, selectedSetA and selectedSetB start as 'all' which is fine
+          dispatch('crossSetToggle', enableCrossSetTrading);
+        }}
         class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
       />
       <span class="font-medium">Enable Cross-Set Trading</span>
@@ -105,10 +115,10 @@
           on:change={handleSetChange}
           class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
+          <option value="all">All Sets</option>
           {#each sortedAvailableSets as set}
             <option value={set.id}>{set.name} - {getSetCompletion(set.id, 'A')}% complete ({set.count})</option>
           {/each}
-          <option value="all">All Sets</option>
         </select>
       </div>
     {:else}

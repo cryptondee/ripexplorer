@@ -387,24 +387,12 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
         
         console.log('Set totals loaded:', setTotals);
         
-        // Set default selection: prefer "151" (sv3pt5) if available, otherwise first set
-        const preferredSet = availableSets.find(set => set.id === 'sv3pt5' || set.name?.includes('151'));
-        if (preferredSet) {
-          selectedSet = preferredSet.id;
-        } else if (availableSets.length > 0) {
-          // Will use sortedAvailableSets[0] after reactive statement updates
-          selectedSet = availableSets[0].id;
-        }
+        // Set default selection to "all" to show all trades initially
+        selectedSet = 'all';
         
         console.log('Trade comparison results:', data);
         console.log('Available rarities:', availableRarities);
         console.log('Default selected set:', selectedSet);
-        
-        // Wait for reactive statement to update sortedAvailableSets, then set proper default
-        await new Promise(resolve => setTimeout(resolve, 0));
-        if (!preferredSet && availableSets.length > 0) {
-          selectedSet = sortedAvailableSets[0]?.id || availableSets[0].id;
-        }
         
         // Load filtered trades for the first time
         await loadFilteredTrades();
@@ -459,7 +447,14 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
         
         filteredTrades = trades;
         // totalPages removed - not used after componentization
-        console.log(`Loaded ${filteredTrades.length} trades for set ${selectedSet}, rarity ${selectedRarity}, type ${selectedTradeType}, page ${currentPage}`);
+        if (enableCrossSetTrading) {
+          console.log(`Cross-set mode: Loaded ${filteredTrades.length} trades - SetA: ${selectedSetA}, SetB: ${selectedSetB}`);
+          const giveTrades = filteredTrades.filter(t => t.tradeType === 'give');
+          const receiveTrades = filteredTrades.filter(t => t.tradeType === 'receive');
+          console.log(`Give trades: ${giveTrades.length}, Receive trades: ${receiveTrades.length}`);
+        } else {
+          console.log(`Loaded ${filteredTrades.length} trades for set ${selectedSet}, rarity ${selectedRarity}, type ${selectedTradeType}, page ${currentPage}`);
+        }
       } else {
         console.error('Failed to load filtered trades:', data.error);
       }
@@ -515,8 +510,8 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
   <title>Trade Finder - rip.fun Data Extractor</title>
 </svelte:head>
 
-<div class="min-h-[90vh] px-6 py-12">
-  <div class="max-w-[90%] mx-auto">
+<div class="min-h-[90vh]">
+  <div>
     <!-- Header -->
     <div class="text-center mb-12">
       <h1 class="text-3xl font-bold text-gray-900 mb-4">🔄 Trade Finder</h1>
@@ -747,7 +742,7 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
               })}
               {#if giveTrades.length > 0}
                 <TradeTable
-                  title="➡️ {tradeResults.userA.username} Can Give {showDuplicatesOnly ? '(Duplicates Only)' : ''}"
+                  title="➡️ {tradeResults.userA.username} can give to {tradeResults.userB.username} {showDuplicatesOnly ? '(Duplicates Only)' : ''}"
                   trades={giveTrades}
                   userCountField="userACount"
                   titleColor="text-orange-600"
@@ -757,6 +752,22 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
                   on:selectionChange={handleGiveCardSelection}
                   on:selectAll={handleGiveSelectAll}
                 />
+              {:else}
+                <div class="bg-white rounded-lg shadow-md p-6">
+                  <div class="text-center py-8">
+                    <div class="text-3xl mb-3">🚫</div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Cards to Give</h3>
+                    <p class="text-sm text-gray-600">
+                      {#if enableCrossSetTrading && selectedSetA !== 'all'}
+                        {tradeResults.userA.username} has no cards from "{sortedAvailableSets.find(s => s.id === selectedSetA)?.name || selectedSetA}" that {tradeResults.userB.username} needs.
+                      {:else if showDuplicatesOnly}
+                        {tradeResults.userA.username} has no duplicate cards to trade without affecting their collection.
+                      {:else}
+                        {tradeResults.userA.username} has no cards that {tradeResults.userB.username} needs from the selected filters.
+                      {/if}
+                    </p>
+                  </div>
+                </div>
               {/if}
 
               {@const receiveTrades = filteredTrades.filter(trade => {
@@ -779,7 +790,7 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
               })}
               {#if receiveTrades.length > 0}
                 <TradeTable
-                  title="⬅️ {tradeResults.userA.username} Can Receive {showDuplicatesOnly ? '(Duplicates Only)' : ''}"
+                  title="⬅️ {tradeResults.userA.username} can receive from {tradeResults.userB.username} {showDuplicatesOnly ? '(Duplicates Only)' : ''}"
                   trades={receiveTrades}
                   userCountField="userBCount"
                   titleColor="text-blue-600"
@@ -789,20 +800,24 @@ TRADE BALANCE: ${receiveValue > giveValue ? '+' : ''}$${(receiveValue - giveValu
                   on:selectionChange={handleReceiveCardSelection}
                   on:selectAll={handleReceiveSelectAll}
                 />
-              {/if}
-
-              <!-- No Trades Message -->
-              {#if giveTrades.length === 0 && receiveTrades.length === 0}
-                <div class="col-span-full">
-                  <div class="bg-white rounded-lg shadow-md p-8">
-                    <div class="text-center py-8">
-                      <div class="text-4xl mb-4">🔍</div>
-                      <h3 class="text-lg font-medium text-gray-900 mb-2">No trades found</h3>
-                      <p class="text-gray-600">Try selecting a different set or check if both users have cards.</p>
-                    </div>
+              {:else}
+                <div class="bg-white rounded-lg shadow-md p-6">
+                  <div class="text-center py-8">
+                    <div class="text-3xl mb-3">📭</div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Cards to Receive</h3>
+                    <p class="text-sm text-gray-600">
+                      {#if enableCrossSetTrading && selectedSetB !== 'all'}
+                        {tradeResults.userB.username} has no cards from "{sortedAvailableSets.find(s => s.id === selectedSetB)?.name || selectedSetB}" that {tradeResults.userA.username} needs.
+                      {:else if showDuplicatesOnly}
+                        {tradeResults.userB.username} has no duplicate cards to trade without affecting their collection.
+                      {:else}
+                        {tradeResults.userB.username} has no cards that {tradeResults.userA.username} needs from the selected filters.
+                      {/if}
+                    </p>
                   </div>
                 </div>
               {/if}
+
             {/if}
           </div>
         {/if}

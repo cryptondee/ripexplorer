@@ -11,6 +11,10 @@
   export let enableSelection: boolean = false;
   export let selectedCards: Set<string> = new Set();
   
+  // Sorting state
+  let sortColumn: 'card' | 'set' | 'rarity' | 'count' | 'value' = 'card';
+  let sortDirection: 'asc' | 'desc' = 'asc';
+  
   // Event dispatcher
   const dispatch = createEventDispatcher<{
     cardClick: any;
@@ -30,10 +34,48 @@
     dispatch('selectAll', selectAll);
   }
   
+  // Sorting function
+  function handleSort(column: 'card' | 'set' | 'rarity' | 'count' | 'value') {
+    if (sortColumn === column) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = column;
+      sortDirection = 'asc';
+    }
+  }
+  
+  // Sort trades based on current sort settings
+  $: sortedTrades = [...trades].sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sortColumn) {
+      case 'card':
+        // Sort by card number numerically
+        const numA = parseInt(a.card.card_number || '0', 10);
+        const numB = parseInt(b.card.card_number || '0', 10);
+        comparison = numA - numB;
+        break;
+      case 'set':
+        comparison = (a.card.set_name || a.card.set_id || '').localeCompare(b.card.set_name || b.card.set_id || '');
+        break;
+      case 'rarity':
+        comparison = (a.card.rarity || '').localeCompare(b.card.rarity || '');
+        break;
+      case 'count':
+        comparison = (a[userCountField] || 0) - (b[userCountField] || 0);
+        break;
+      case 'value':
+        comparison = (a.estimatedValue || 0) - (b.estimatedValue || 0);
+        break;
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+  
   // Check if all visible cards are selected
-  $: allSelected = enableSelection && trades.length > 0 && trades.every(trade => selectedCards.has(trade.card.id));
-  $: someSelected = enableSelection && trades.some(trade => selectedCards.has(trade.card.id));
-  $: selectedCount = enableSelection ? trades.filter(trade => selectedCards.has(trade.card.id)).length : trades.length;
+  $: allSelected = enableSelection && sortedTrades.length > 0 && sortedTrades.every(trade => selectedCards.has(trade.card.id));
+  $: someSelected = enableSelection && sortedTrades.some(trade => selectedCards.has(trade.card.id));
+  $: selectedCount = enableSelection ? sortedTrades.filter(trade => selectedCards.has(trade.card.id)).length : sortedTrades.length;
 
   function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('en-US', {
@@ -124,15 +166,50 @@
               />
             </th>
           {/if}
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card</th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Set</th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rarity</th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('card')}>
+            <div class="flex items-center space-x-1">
+              <span>Card</span>
+              {#if sortColumn === 'card'}
+                <span class="text-gray-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              {/if}
+            </div>
+          </th>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('set')}>
+            <div class="flex items-center space-x-1">
+              <span>Set</span>
+              {#if sortColumn === 'set'}
+                <span class="text-gray-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              {/if}
+            </div>
+          </th>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('rarity')}>
+            <div class="flex items-center space-x-1">
+              <span>Rarity</span>
+              {#if sortColumn === 'rarity'}
+                <span class="text-gray-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              {/if}
+            </div>
+          </th>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('count')}>
+            <div class="flex items-center space-x-1">
+              <span>Count</span>
+              {#if sortColumn === 'count'}
+                <span class="text-gray-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              {/if}
+            </div>
+          </th>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('value')}>
+            <div class="flex items-center space-x-1">
+              <span>Value</span>
+              {#if sortColumn === 'value'}
+                <span class="text-gray-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+              {/if}
+            </div>
+          </th>
         </tr>
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
-        {#each trades as trade}
+        {#each sortedTrades as trade}
           <tr 
             class="{getRowHighlighting(trade)}" 
             style="{getRowStyle(trade)}"

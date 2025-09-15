@@ -27,7 +27,7 @@
 		</div>
 	</nav>
 	
-	<main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+	<main style="max-width: 90%; margin: 0 auto; padding: 1.5rem;">
 		{@render children?.()}
 	</main>
 	
