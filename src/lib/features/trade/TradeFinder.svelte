@@ -106,7 +106,7 @@
         userB,
         page: filters.currentPage,
         limit: filters.itemsPerPage,
-        set: filters.selectedSet
+        set: filters.selectedSet === 'all' ? undefined : filters.selectedSet
       });
       
       let trades = data.trades || [];
@@ -242,9 +242,9 @@
           const total = setTotals[setId] || 0;
           return total > 0 ? Math.round((owned[setId] || 0) / total * 100) : 0;
         }}
-        on:setChange={handleSetChange}
-        on:rarityChange={handleRarityChange}
-        on:tradeTypeChange={handleTradeTypeChange}
+        on:setChange={(e) => handleSetChange(e.detail)}
+        on:rarityChange={(e) => handleRarityChange(e.detail)}
+        on:tradeTypeChange={(e) => handleTradeTypeChange(e.detail)}
       />
       
       <!-- Trade Table -->
