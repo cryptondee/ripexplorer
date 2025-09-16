@@ -218,7 +218,7 @@
       />
       
       <!-- Summary Cards -->
-      <TradeSummaryCards {tradeResults} />
+      <TradeSummaryCards tradeSummary={tradeResults.tradeAnalysis?.summary} />
       
       <!-- Value Analysis -->
       <TradeValueAnalysis {tradeResults} {filteredTrades} />
