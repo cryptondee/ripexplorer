@@ -247,14 +247,30 @@
         on:tradeTypeChange={(e) => handleTradeTypeChange(e.detail)}
       />
       
-      <!-- Trade Table -->
-      <TradeTable
-        trades={filteredTrades}
-        {enableCardSelection}
-        {selectedGiveCards}
-        {selectedReceiveCards}
-        on:cardClick={handleCardClick}
-      />
+      <!-- Trade Tables -->
+      <div class="space-y-6">
+        <!-- Cards User A Can Receive from User B -->
+        <TradeTable
+          title="🔄 Cards {tradeResults.userA?.username || 'User A'} Can Receive from {tradeResults.userB?.username || 'User B'}"
+          trades={filteredTrades.filter(trade => trade.tradeType === 'receive')}
+          userCountField="userBCount"
+          titleColor="text-blue-600"
+          enableSelection={enableCardSelection}
+          selectedCards={selectedReceiveCards}
+          on:cardClick={handleCardClick}
+        />
+        
+        <!-- Cards User A Can Give to User B -->
+        <TradeTable
+          title="🎁 Cards {tradeResults.userA?.username || 'User A'} Can Give to {tradeResults.userB?.username || 'User B'}"
+          trades={filteredTrades.filter(trade => trade.tradeType === 'give')}
+          userCountField="userACount"
+          titleColor="text-green-600"
+          enableSelection={enableCardSelection}
+          selectedCards={selectedGiveCards}
+          on:cardClick={handleCardClick}
+        />
+      </div>
       
       <!-- Set Summary -->
       {#if tradeResults.ownedBySetA && tradeResults.ownedBySetB}
