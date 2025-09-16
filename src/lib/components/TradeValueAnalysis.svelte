@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatCurrency } from '$lib/utils/format';
   // Props
   export let tradeAnalysis: {
     summary: {
@@ -10,7 +11,6 @@
   };
   export let userA: { username: string };
   export let userB: { username: string };
-  export let formatCurrency: (amount: number) => string;
 
   // Check if we should show the component
   $: hasValue = tradeAnalysis.summary.estimatedPerfectTradeValue > 0 || 
