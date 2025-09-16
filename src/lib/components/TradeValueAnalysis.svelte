@@ -8,14 +8,25 @@
       estimatedOneWayToBValue: number;
       tradeBalance: 'even' | 'favors_a' | 'favors_b';
     };
+  } | undefined = undefined;
+  export let userA: { username: string } | undefined = undefined;
+  export let userB: { username: string } | undefined = undefined;
+  
+  // Safe defaults
+  $: safeAnalysis = tradeAnalysis?.summary || {
+    estimatedPerfectTradeValue: 0,
+    estimatedOneWayToAValue: 0,
+    estimatedOneWayToBValue: 0,
+    tradeBalance: 'even' as const
   };
-  export let userA: { username: string };
-  export let userB: { username: string };
+  
+  $: safeUserA = userA || { username: 'User A' };
+  $: safeUserB = userB || { username: 'User B' };
 
   // Check if we should show the component
-  $: hasValue = tradeAnalysis.summary.estimatedPerfectTradeValue > 0 || 
-                tradeAnalysis.summary.estimatedOneWayToAValue > 0 || 
-                tradeAnalysis.summary.estimatedOneWayToBValue > 0;
+  $: hasValue = safeAnalysis.estimatedPerfectTradeValue > 0 || 
+                safeAnalysis.estimatedOneWayToAValue > 0 || 
+                safeAnalysis.estimatedOneWayToBValue > 0;
 
   // Trade balance helper functions
   function getBalanceIcon(balance: string): string {
@@ -29,10 +40,10 @@
 
   function getBalanceMessage(balance: string): string {
     switch (balance) {
-      case 'even': return 'Trade values are well balanced';
-      case 'favors_a': return `Trade favors ${userA.username}`;
-      case 'favors_b': return `Trade favors ${userB.username}`;
-      default: return 'Trade values are well balanced';
+      case 'even': return 'Trade values are roughly equal';
+      case 'favors_a': return `Trade favors ${safeUserA.username}`;
+      case 'favors_b': return `Trade favors ${safeUserB.username}`;
+      default: return 'Trade balance unknown';
     }
   }
 
@@ -49,7 +60,7 @@
     }
   }
 
-  $: balanceStyles = getBalanceStyles(tradeAnalysis.summary.tradeBalance);
+  $: balanceStyles = getBalanceStyles(safeAnalysis.tradeBalance);
 </script>
 
 {#if hasValue}
@@ -58,21 +69,21 @@
     <div class="grid md:grid-cols-3 gap-4">
       <div class="text-center p-4 bg-green-50 rounded-lg border border-green-200">
         <p class="text-lg font-bold text-green-600">
-          {formatCurrency(tradeAnalysis.summary.estimatedPerfectTradeValue)}
+          {formatCurrency(safeAnalysis.estimatedPerfectTradeValue)}
         </p>
         <p class="text-sm text-green-700">Perfect Trades Value</p>
       </div>
       <div class="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
         <p class="text-lg font-bold text-blue-600">
-          {formatCurrency(tradeAnalysis.summary.estimatedOneWayToAValue)}
+          {formatCurrency(safeAnalysis.estimatedOneWayToAValue)}
         </p>
-        <p class="text-sm text-blue-700">{userA.username} Can Receive</p>
+        <p class="text-sm text-blue-700">{safeUserA.username} Can Receive</p>
       </div>
       <div class="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
         <p class="text-lg font-bold text-orange-600">
-          {formatCurrency(tradeAnalysis.summary.estimatedOneWayToBValue)}
+          {formatCurrency(safeAnalysis.estimatedOneWayToBValue)}
         </p>
-        <p class="text-sm text-orange-700">{userA.username} Can Give</p>
+        <p class="text-sm text-orange-700">{safeUserA.username} Can Give</p>
       </div>
     </div>
     
@@ -80,10 +91,10 @@
     <div class="mt-4 p-4 rounded-lg {balanceStyles.container}">
       <div class="flex items-center justify-center space-x-2">
         <span class="text-lg">
-          {getBalanceIcon(tradeAnalysis.summary.tradeBalance)}
+          {getBalanceIcon(safeAnalysis.tradeBalance)}
         </span>
         <span class="font-medium {balanceStyles.text}">
-          {getBalanceMessage(tradeAnalysis.summary.tradeBalance)}
+          {getBalanceMessage(safeAnalysis.tradeBalance)}
         </span>
       </div>
     </div>

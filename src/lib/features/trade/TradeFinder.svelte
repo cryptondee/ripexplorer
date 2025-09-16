@@ -221,7 +221,11 @@
       <TradeSummaryCards tradeSummary={tradeResults.tradeAnalysis?.summary} />
       
       <!-- Value Analysis -->
-      <TradeValueAnalysis {tradeResults} {filteredTrades} />
+      <TradeValueAnalysis 
+        tradeAnalysis={tradeResults.tradeAnalysis}
+        userA={tradeResults.userA}
+        userB={tradeResults.userB}
+      />
       
       <!-- Filters -->
       <TradeFilters
