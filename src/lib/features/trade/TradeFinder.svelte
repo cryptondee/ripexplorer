@@ -126,10 +126,8 @@
           // For give trades, check if User A has more than 1
           // For receive trades, check if User B has more than 1
           const count = trade.tradeType === 'give' ? trade.userACount : trade.userBCount;
-          console.log('Duplicate filter:', trade.card?.name, 'count:', count, 'tradeType:', trade.tradeType);
           return count && count > 1;
         });
-        console.log('Filtered trades after duplicates:', trades.length);
       }
       
       filteredTrades = trades;
