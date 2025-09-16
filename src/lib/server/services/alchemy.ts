@@ -1,5 +1,7 @@
-import { createPublicClient, http, getAddress, type PublicClient } from 'viem';
+import { Alchemy, Network } from 'alchemy-sdk';
+import { createPublicClient, http, parseAbiItem, getAddress, type PublicClient } from 'viem';
 import { base } from 'viem/chains';
+import { EXTERNAL_URLS } from '$lib/constants/urls.js';
 
 // Configuration for Alchemy
 const config = {
@@ -25,7 +27,7 @@ export class AlchemyService {
     // Create Viem client for better asset transfer handling
     this.client = createPublicClient({
       chain: base,
-      transport: http(`https://base-mainnet.g.alchemy.com/v2/${config.apiKey}`)
+      transport: http(EXTERNAL_URLS.ALCHEMY.BASE_MAINNET_RPC(config.apiKey))
     });
   }
 

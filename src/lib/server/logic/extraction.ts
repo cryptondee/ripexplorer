@@ -7,8 +7,11 @@
  * direct function calls instead of internal HTTP requests for better performance.
  */
 
-import { extractFromRipFunAPI } from '../services/parser.js';
-import { userSyncService } from '../services/userSync.js';
+import { extractFromRipFunAPI } from '$lib/server/services/parser.js';
+import { userSyncService } from '$lib/server/services/userSync.js';
+import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+import { DEFAULT_HEADERS } from '$lib/constants/http.js';
+import { logger } from '$lib/utils/logger.js';
 
 /**
  * Resolve username to user ID by fetching the rip.fun profile page
@@ -16,18 +19,16 @@ import { userSyncService } from '../services/userSync.js';
  */
 async function resolveUsernameFromProfilePage(username: string): Promise<number | null> {
   try {
-    const profileUrl = `https://www.rip.fun/profile/${username}`;
-    console.log(`Attempting to resolve username '${username}' via profile page: ${profileUrl}`);
+    const profileUrl = EXTERNAL_URLS.RIP_FUN.PROFILE(username);
+    logger.log(`Attempting to resolve username '${username}' via profile page: ${profileUrl}`);
     
     const response = await fetch(profileUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+      headers: DEFAULT_HEADERS
     });
     
     if (!response.ok) {
       if (response.status === 404) {
-        console.log(`Profile not found for username: ${username}`);
+        logger.log(`Profile not found for username: ${username}`);
         return null;
       }
       throw new Error(`Profile page returned ${response.status}`);
@@ -42,22 +43,22 @@ async function resolveUsernameFromProfilePage(username: string): Promise<number 
                        html.match(/user[_-]?id["']?:\s*["']?(\d+)/i);
     
     if (userIdMatch) {
-      const userId = parseInt(userIdMatch[1]);
-      console.log(`Extracted user ID ${userId} from profile page for ${username}`);
+      const userId = parseInt(userIdMatch[1], 10);
+      logger.log(`Resolved username '${username}' to ID: ${userId}`);
       return userId;
     }
     
-    console.log(`Could not find user ID in profile page for username: ${username}`);
+    logger.log(`No user ID found in profile page for username: ${username}`);
     return null;
-    
   } catch (error) {
-    console.error(`Failed to resolve username '${username}' from profile page:`, error);
+    logger.error(`Failed to resolve username '${username}' from profile page:`, error);
     return null;
   }
 }
 
 export interface ExtractionOptions {
   forceRefresh?: boolean;
+  method?: string;
 }
 
 export interface ExtractionResult {
@@ -132,10 +133,10 @@ export async function extractUserProfile(
     // Input is numeric, treat as user ID
     resolvedUserId = parseInt(trimmedInput);
     resolutionMethod = 'numeric';
-    console.log(`Using numeric input as user ID: ${resolvedUserId}`);
+    logger.log(`Using numeric input as user ID: ${resolvedUserId}`);
   }
   
-  const targetUrl = `https://www.rip.fun/profile/${resolvedUsername}`;
+  const targetUrl = EXTERNAL_URLS.RIP_FUN.PROFILE(resolvedUsername);
   let extractedData;
   let extractionMethod = 'api';
   let apiCallsMade = 0;

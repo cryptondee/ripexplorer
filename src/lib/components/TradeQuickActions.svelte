@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { EXTERNAL_URLS } from '$lib/constants/urls.js';
 
   // Props
   export let userA: { username: string };
@@ -18,11 +19,11 @@
   }>();
 
   function openProfileA() {
-    window.open(`https://www.rip.fun/profile/${userA.username}`, '_blank');
+    window.open(EXTERNAL_URLS.RIP_FUN.PROFILE(userA.username), '_blank');
   }
 
   function openProfileB() {
-    window.open(`https://www.rip.fun/profile/${userB.username}`, '_blank');
+    window.open(EXTERNAL_URLS.RIP_FUN.PROFILE(userB.username), '_blank');
   }
 
   function copyGeneralSummary() {
