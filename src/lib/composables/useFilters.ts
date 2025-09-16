@@ -27,7 +27,7 @@ export function useFilters(
   } = options;
 
   // Initialize filter state with defaults
-  let filters = $state<FilterState>({
+  let filters: FilterState = {
     selectedSet: 'all',
     selectedRarity: 'all',
     selectedTradeType: 'all',
@@ -35,7 +35,7 @@ export function useFilters(
     currentPage: 1,
     itemsPerPage: 50,
     ...initialState
-  });
+  };
 
   /**
    * Generic filter change handler
@@ -91,7 +91,7 @@ export function useFilters(
   }
 
   return {
-    filters: $state.snapshot(filters),
+    filters,
     
     // Individual handlers for each filter
     handleSetChange: (value: string) => handleFilterChange('selectedSet', value),

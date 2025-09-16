@@ -1,6 +1,0 @@
-<script lang="ts">
-  import SalesDashboard from '$lib/features/sales/SalesDashboard.svelte';
-</script>
-
-<!-- Thin route wrapper - all logic moved to SalesDashboard component -->
-<SalesDashboard />
