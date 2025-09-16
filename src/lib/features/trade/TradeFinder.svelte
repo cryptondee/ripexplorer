@@ -120,6 +120,14 @@
         trades = trades.filter((trade: any) => trade.tradeType === filters.selectedTradeType);
       }
       
+      // Filter for duplicates only if enabled
+      if (filters.showDuplicatesOnly) {
+        trades = trades.filter((trade: any) => {
+          const count = trade.tradeType === 'give' ? trade.userACount : trade.userBCount;
+          return count > 1;
+        });
+      }
+      
       filteredTrades = trades;
     } catch (err) {
       console.error('Failed to load filtered trades:', err);
@@ -248,7 +256,7 @@
       />
       
       <!-- Trade Tables -->
-      <div class="space-y-6">
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <!-- Cards User A Can Receive from User B -->
         <TradeTable
           title="🔄 Cards {tradeResults.userA?.username || 'User A'} Can Receive from {tradeResults.userB?.username || 'User B'}"
