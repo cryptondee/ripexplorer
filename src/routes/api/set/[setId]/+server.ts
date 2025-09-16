@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
-import { redisCache, CacheKeys } from '$lib/server/redis/client.js';
 import type { RequestHandler } from './$types';
+import { redisCache, CacheKeys } from '$lib/server/redis/client.js';
+import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+import { createRipFunFetchOptions } from '$lib/constants/http.js';
 
 export const GET: RequestHandler = async ({ params, url }) => {
   const { setId } = params;
@@ -34,16 +36,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
     const all = url.searchParams.get('all') || 'true';
 
     // Fetch data from rip.fun API
-    const response = await fetch(
-      `https://www.rip.fun/api/set/${setId}/cards?page=${page}&limit=${limit}&sort=${sort}&all=${all}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'application/json',
-          'Referer': 'https://www.rip.fun/'
-        }
-      }
-    );
+    const apiUrl = EXTERNAL_URLS.RIP_FUN.API_SET_CARDS(setId, { page, limit, sort, all });
+    const response = await fetch(apiUrl, createRipFunFetchOptions());
 
     if (!response.ok) {
       throw new Error(`rip.fun API returned ${response.status}: ${response.statusText}`);

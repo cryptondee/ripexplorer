@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { alchemyService } from './alchemy.js';
+import { getAddress } from 'viem';
+import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+import { createRipFunFetchOptions } from '$lib/constants/http.js';
+import { logger } from '$lib/utils/logger.js';
 
 const prisma = new PrismaClient();
 
@@ -22,19 +26,13 @@ export class UserSyncService {
       // Convert to EIP-55 checksum format for rip.fun API compatibility
       let checksumAddress = address;
       try {
-        const { getAddress } = await import('viem');
-        checksumAddress = getAddress(address);
+        checksumAddress = getAddress(address as `0x${string}`);
       } catch (error) {
-        console.warn('Failed to convert to checksum address:', address, error);
+        logger.warn('Failed to convert to checksum address:', address, error);
       }
       
-      const response = await fetch(`https://rip.fun/api/auth/${checksumAddress}`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'application/json',
-          'Referer': 'https://www.rip.fun/'
-        }
-      });
+      const apiUrl = EXTERNAL_URLS.RIP_FUN.API_AUTH(checksumAddress);
+      const response = await fetch(apiUrl, createRipFunFetchOptions());
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -48,7 +46,7 @@ export class UserSyncService {
       return userData;
 
     } catch (error) {
-      console.warn(`Failed to fetch user data for address ${address}:`, error);
+      logger.error(`Error fetching user info for ${address}:`, error);
       return null;
     }
   }
@@ -110,12 +108,7 @@ export class UserSyncService {
             const userData = await this.fetchRipFunUserByAddress(address);
             
             if (userData) {
-              console.log(`Address ${address} returned userData:`, { 
-                id: userData.id, 
-                username: userData.username, 
-                hasId: !!userData.id, 
-                hasUsername: !!userData.username 
-              });
+              logger.log(`  Found user for ${address}: ${userData.username} (ID: ${userData.id})`);
             }
             
             if (userData && userData.id && userData.username) {
@@ -166,7 +159,7 @@ export class UserSyncService {
             }
 
           } catch (error) {
-            console.warn(`Error processing address ${address}:`, error);
+            logger.error(`Error processing address ${address}:`, error);
           }
         }));
 
@@ -222,7 +215,7 @@ export class UserSyncService {
 
       return user?.id || null;
     } catch (error) {
-      console.error(`Error finding user by username ${username}:`, error);
+      logger.error(`Error finding user by username ${username}:`, error);
       return null;
     }
   }
@@ -241,7 +234,7 @@ export class UserSyncService {
 
       return user;
     } catch (error) {
-      console.error(`Error finding user by username ${username}:`, error);
+      logger.error(`Error finding user by username ${username}:`, error);
       return null;
     }
   }
@@ -281,7 +274,7 @@ export class UserSyncService {
 
       return users;
     } catch (error) {
-      console.error(`Error searching users with query ${query}:`, error);
+      logger.error(`Error searching users with query ${query}:`, error);
       return [];
     }
   }

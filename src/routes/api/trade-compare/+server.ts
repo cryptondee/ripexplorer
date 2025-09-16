@@ -1,7 +1,9 @@
 import { json } from '@sveltejs/kit';
-import { tradeAnalyzer } from '$lib/server/services/tradeAnalyzer.js';
-import { extractUserProfile } from '$lib/server/logic/extraction.js';
 import { redisCache, CacheKeys } from '$lib/server/redis/client.js';
+import { extractUserProfile } from '$lib/server/logic/extraction.js';
+import { tradeAnalyzer } from '$lib/server/services/tradeAnalyzer.js';
+import { CACHE_DURATIONS } from '$lib/constants/cache.js';
+import { logger } from '$lib/utils/logger.js';
 import type { RequestHandler } from './$types.js';
 
 // Cache of setId -> Set of standardized card keys (matches TradeAnalyzer key format `card_<id>`)
@@ -16,28 +18,25 @@ async function getUserProfileForTrade(input: string, forceRefresh: boolean = fal
     const cachedResult = await redisCache.get(cacheKey);
     
     if (cachedResult && cachedResult.extractedData) {
-      console.log(`🔴 Cache HIT for trade profile: ${input}`);
+      logger.cache('HIT', `trade profile: ${input}`);
       return {
-        username: cachedResult.username,
-        id: cachedResult.resolvedUserId,
-        profile: cachedResult.extractedData.profile,
-        cards: cachedResult.extractedData.profile?.digital_cards || [],
+        ...cachedResult,
         cached: true
       };
     }
-    console.log(`🔴 Cache MISS for trade profile: ${input}`);
+    logger.cache('MISS', `trade profile: ${input}`);
   }
   
   // Use the shared extraction logic directly (no HTTP overhead)
   const extractData = await extractUserProfile(input, { method: 'auto' });
   
-  // Cache the extraction result for 1 hour
+  // Cache the extraction result
   try {
     const cacheKey = CacheKeys.extraction(input);
-    await redisCache.set(cacheKey, extractData, 3600);
-    console.log(`🔴 Cache STORED for trade profile: ${input}`);
+    await redisCache.set(cacheKey, extractData, CACHE_DURATIONS.TRADE_COMPARISON);
+    logger.cache('STORE', `trade profile: ${input}`);
   } catch (cacheError) {
-    console.warn('Failed to cache trade profile:', cacheError);
+    logger.warn('Failed to cache trade profile:', cacheError);
   }
   
   console.log(`Profile extracted for ${extractData.username}: ${extractData.extractedData.profile?.digital_cards?.length || 0} cards`);
@@ -186,10 +185,10 @@ export const POST: RequestHandler = async ({ request }) => {
     if (!forceRefresh) {
       const cachedTrade = await redisCache.get(tradeCacheKey);
       if (cachedTrade) {
-        console.log(`🔴 Cache HIT for trade analysis: ${userA} vs ${userB}`);
+        logger.cache('HIT', `trade analysis: ${userA} vs ${userB}`);
         return json({ ...cachedTrade, cached: true });
       }
-      console.log(`🔴 Cache MISS for trade analysis: ${userA} vs ${userB}`);
+      logger.cache('MISS', `trade analysis: ${userA} vs ${userB}`);
     }
     
     // Use the shared analysis function
@@ -201,7 +200,8 @@ export const POST: RequestHandler = async ({ request }) => {
     // Generate recommendations
     const recommendations = tradeAnalyzer.generateTradeRecommendations(tradeAnalysis, collectionA, collectionB);
     
-    console.log(`- Available sets: ${availableSets.length}`);
+    logger.log('User A cards:', rawCardsA.length);
+    logger.log('User B cards:', rawCardsB.length);
     
     const responseData = {
       success: true,
@@ -243,7 +243,7 @@ export const POST: RequestHandler = async ({ request }) => {
     return json(responseData);
     
   } catch (error) {
-    console.error('Trade comparison failed:', error);
+    logger.error('Trade comparison failed:', error);
     return json({ 
       error: 'Trade comparison failed', 
       details: error instanceof Error ? error.message : 'Unknown error' 

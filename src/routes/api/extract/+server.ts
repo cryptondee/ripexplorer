@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { redisCache, CacheKeys } from '$lib/server/redis/client.js';
 import { extractUserProfile } from '$lib/server/logic/extraction.js';
+import { CACHE_DURATIONS } from '$lib/constants/cache.js';
+import { logger } from '$lib/utils/logger.js';
 import type { RequestHandler } from './$types.js';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -19,7 +21,7 @@ export const POST: RequestHandler = async ({ request }) => {
       const cachedResult = await redisCache.get(cacheKey);
       
       if (cachedResult) {
-        console.log(`🔴 Cache HIT for extraction: ${trimmedInput}`);
+        logger.cache('HIT', `extraction: ${trimmedInput}`);
         return json({
           ...cachedResult,
           cached: true,
@@ -27,22 +29,22 @@ export const POST: RequestHandler = async ({ request }) => {
         });
       }
       
-      console.log(`🔴 Cache MISS for extraction: ${trimmedInput}`);
+      logger.cache('MISS', `extraction: ${trimmedInput}`);
     } else {
-      console.log(`🔴 Cache SKIP (force refresh) for extraction: ${trimmedInput}`);
+      logger.cache('SKIP', `extraction: ${trimmedInput}`, '(force refresh)');
     }
     
     // Use the shared extraction logic
     const responseData = await extractUserProfile(trimmedInput, {});
     
-    // Cache successful extraction for 1 hour (3600 seconds)
+    // Cache successful extraction
     try {
       const cacheKey = CacheKeys.extraction(trimmedInput);
-      await redisCache.set(cacheKey, responseData, 3600);
-      console.log(`🔴 Cache STORED for extraction: ${trimmedInput}`);
+      await redisCache.set(cacheKey, responseData, CACHE_DURATIONS.USER_EXTRACTION);
+      logger.cache('STORE', `extraction: ${trimmedInput}`);
     } catch (cacheError) {
       // Don't fail the request if caching fails
-      console.warn('Failed to cache extraction result:', cacheError);
+      logger.warn('Failed to cache extraction result:', cacheError);
     }
     
     return json({
@@ -51,7 +53,7 @@ export const POST: RequestHandler = async ({ request }) => {
     });
     
   } catch (error) {
-    console.error('Extraction failed:', error);
+    logger.error('Extraction failed:', error);
     const message = error instanceof Error ? error.message : 'Unknown error occurred';
     return json({ error: `Extraction failed: ${message}` }, { status: 500 });
   }

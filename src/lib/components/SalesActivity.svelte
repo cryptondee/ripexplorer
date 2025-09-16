@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { formatAddress } from '$lib/utils/format.js';
+  import { EXTERNAL_URLS } from '$lib/constants/urls.js';
   import { createEventDispatcher } from 'svelte';
 
   interface SalesEvent {
@@ -136,9 +138,6 @@
     return new Date(timestamp).toLocaleTimeString();
   }
 
-  function formatAddress(address: string): string {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }
 
   function getRarityColor(rarity?: string): string {
     if (!rarity) return 'text-gray-500';
@@ -236,7 +235,7 @@
                   {event.seller.username || formatAddress(event.seller.address)}
                 </span>
                 <a 
-                  href="https://basescan.org/tx/{event.transactionHash}"
+                  href={EXTERNAL_URLS.BASESCAN.TX(event.transactionHash)}
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-indigo-600 hover:text-indigo-900"

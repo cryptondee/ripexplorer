@@ -3,6 +3,8 @@
   import SalesActivity from '$lib/components/SalesActivity.svelte';
   import SalesFilters from '$lib/components/SalesFilters.svelte';
   import SalesStats from '$lib/components/SalesStats.svelte';
+  import { formatAddress } from '$lib/utils/format.js';
+  import { EXTERNAL_URLS } from '$lib/constants/urls.js';
 
   // Filter state
   let filters = {
@@ -95,9 +97,6 @@
     loadHistoricalSales();
   }
 
-  function formatAddress(address: string): string {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }
 
   function formatTimestamp(timestamp: string): string {
     return new Date(timestamp).toLocaleString();
@@ -326,7 +325,7 @@
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <a 
-                          href="https://basescan.org/tx/{sale.transactionHash}"
+                          href={EXTERNAL_URLS.BASESCAN.TX(sale.transactionHash)}
                           target="_blank"
                           rel="noopener noreferrer"
                           class="text-indigo-600 hover:text-indigo-900"

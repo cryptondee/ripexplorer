@@ -1,5 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+import { createRipFunFetchOptions } from '$lib/constants/http.js';
 
 export const GET: RequestHandler = async ({ params }) => {
   const { cardId } = params;
@@ -10,16 +12,8 @@ export const GET: RequestHandler = async ({ params }) => {
 
   try {
     // Fetch listing data from rip.fun API
-    const response = await fetch(
-      `https://www.rip.fun/api/card/${cardId}/listings`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'application/json',
-          'Referer': 'https://www.rip.fun/'
-        }
-      }
-    );
+    const apiUrl = EXTERNAL_URLS.RIP_FUN.API_CARD_LISTINGS(cardId);
+    const response = await fetch(apiUrl, createRipFunFetchOptions());
 
     if (!response.ok) {
       throw new Error(`rip.fun API returned ${response.status}: ${response.statusText}`);

@@ -1,14 +1,17 @@
+import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+import { logger } from '$lib/utils/logger.js';
+
 /**
  * Extract user data directly from rip.fun owned-cards API endpoint.
  * Input should be a user ID (e.g., "2010" for ndw).
  */
 export async function extractFromRipFunAPI(userId: string): Promise<any> {
   try {
-    console.log(`Starting API extraction for user ID: ${userId}`);
+    logger.log(`Starting API extraction for user ID: ${userId}`);
     
     // Get complete card collection using user ID
-    const cardsUrl = `https://www.rip.fun/api/user/${userId}/owned-cards`;
-    console.log(`Fetching owned cards from: ${cardsUrl}`);
+    const cardsUrl = EXTERNAL_URLS.RIP_FUN.API_USER_CARDS(userId);
+    logger.api('GET', cardsUrl);
     
     const cardsResponse = await fetch(cardsUrl);
     if (!cardsResponse.ok) {
@@ -25,7 +28,7 @@ export async function extractFromRipFunAPI(userId: string): Promise<any> {
     }
     
     const allCards = cardsData.cards;
-    console.log(`Successfully fetched ${allCards.length} total cards from API`);
+    logger.log(`Successfully fetched ${allCards.length} total cards from API`);
     
     // Clean and transform API data, removing clip_embedding
     const transformedCards = allCards.map((cardData: any) => {
@@ -93,7 +96,7 @@ export async function extractFromRipFunAPI(userId: string): Promise<any> {
       totalValue: `$${profile.total_value}`
     };
     
-    console.log(`API extraction complete: ${transformedCards.length} cards, total value $${profile.total_value}`);
+    logger.log(`API extraction complete: ${transformedCards.length} cards, total value $${profile.total_value}`);
     
     return {
       profile,
@@ -103,7 +106,7 @@ export async function extractFromRipFunAPI(userId: string): Promise<any> {
     };
     
   } catch (error) {
-    console.error('Failed to extract data from rip.fun API:', error);
+    logger.error('API extraction failed:', error);
     throw new Error(`API extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
