@@ -123,8 +123,10 @@
       // Filter for duplicates only if enabled
       if (filters.showDuplicatesOnly) {
         trades = trades.filter((trade: any) => {
+          // For give trades, check if User A has more than 1
+          // For receive trades, check if User B has more than 1
           const count = trade.tradeType === 'give' ? trade.userACount : trade.userBCount;
-          return count > 1;
+          return count && count > 1;
         });
       }
       
@@ -257,18 +259,7 @@
       
       <!-- Trade Tables -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <!-- Cards User A Can Receive from User B -->
-        <TradeTable
-          title="🔄 Cards {tradeResults.userA?.username || 'User A'} Can Receive from {tradeResults.userB?.username || 'User B'}"
-          trades={filteredTrades.filter(trade => trade.tradeType === 'receive')}
-          userCountField="userBCount"
-          titleColor="text-blue-600"
-          enableSelection={enableCardSelection}
-          selectedCards={selectedReceiveCards}
-          on:cardClick={handleCardClick}
-        />
-        
-        <!-- Cards User A Can Give to User B -->
+        <!-- Cards User A Can Give to User B (LEFT) -->
         <TradeTable
           title="🎁 Cards {tradeResults.userA?.username || 'User A'} Can Give to {tradeResults.userB?.username || 'User B'}"
           trades={filteredTrades.filter(trade => trade.tradeType === 'give')}
@@ -276,6 +267,17 @@
           titleColor="text-green-600"
           enableSelection={enableCardSelection}
           selectedCards={selectedGiveCards}
+          on:cardClick={handleCardClick}
+        />
+        
+        <!-- Cards User A Can Receive from User B (RIGHT) -->
+        <TradeTable
+          title="🔄 Cards {tradeResults.userA?.username || 'User A'} Can Receive from {tradeResults.userB?.username || 'User B'}"
+          trades={filteredTrades.filter(trade => trade.tradeType === 'receive')}
+          userCountField="userBCount"
+          titleColor="text-blue-600"
+          enableSelection={enableCardSelection}
+          selectedCards={selectedReceiveCards}
           on:cardClick={handleCardClick}
         />
       </div>
