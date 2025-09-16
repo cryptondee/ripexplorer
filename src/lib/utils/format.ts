@@ -60,3 +60,19 @@ export function formatNumber(num: number | string): string {
   if (isNaN(n)) return '0';
   return n.toLocaleString();
 }
+
+/**
+ * Format currency with proper locale formatting
+ * @param amount - Amount to format
+ * @param currency - Currency code (default: USD)
+ * @param locale - Locale string (default: en-US)
+ * @returns Formatted currency string
+ */
+export function formatCurrency(amount: number, currency: string = 'USD', locale: string = 'en-US'): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+}

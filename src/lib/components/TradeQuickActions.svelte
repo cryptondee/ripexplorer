@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+  import { useClipboard } from '$lib/composables/useClipboard';
 
   // Props
   export let userA: { username: string };
@@ -26,17 +27,22 @@
     window.open(EXTERNAL_URLS.RIP_FUN.PROFILE(userB.username), '_blank');
   }
 
-  function copyGeneralSummary() {
+  const { copy } = useClipboard();
+  
+  async function copyGeneralSummary() {
     const summary = `Trade Analysis: ${userA.username} vs ${userB.username}\n` +
                    `Perfect Trades: ${tradeAnalysis.summary.totalPerfectTrades}\n` +
                    `${userA.username} can receive: ${tradeAnalysis.summary.totalOneWayToA} cards\n` +
                    `${userA.username} can give: ${tradeAnalysis.summary.totalOneWayToB} cards\n` +
                    `Generated on: ${new Date().toLocaleDateString()}`;
     
-    navigator.clipboard.writeText(summary).then(() => {
-      alert('Trade summary copied to clipboard!');
-      dispatch('copyGeneralSummary');
+    const success = await copy(summary, {
+      successMessage: 'Trade summary copied to clipboard!'
     });
+    
+    if (success) {
+      dispatch('copyGeneralSummary');
+    }
   }
 </script>
 

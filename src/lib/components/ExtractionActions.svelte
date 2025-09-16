@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { useClipboard } from '$lib/composables/useClipboard';
   
   interface Props {
     ripUserId: string;
@@ -160,13 +161,18 @@
     dispatch('dataExported', { type: 'download' });
   }
 
-  function copyToClipboard() {
+  const { copyJSON } = useClipboard();
+  
+  async function copyToClipboard() {
     if (!extractedData) return;
     
-    navigator.clipboard.writeText(JSON.stringify(extractedData, null, 2)).then(() => {
-      console.log('Copied to clipboard');
-      dispatch('dataExported', { type: 'clipboard' });
+    const success = await copyJSON(extractedData, {
+      successMessage: 'Data copied to clipboard!'
     });
+    
+    if (success) {
+      dispatch('dataExported', { type: 'clipboard' });
+    }
   }
 </script>
 
