@@ -3,8 +3,14 @@
  * Provides environment-aware logging to prevent console pollution in production
  */
 
-const isDev = process.env.NODE_ENV === 'development';
-const isDebugEnabled = process.env.DEBUG === 'true';
+// Browser-safe environment checks
+const isDev = typeof process !== 'undefined' 
+  ? process.env.NODE_ENV === 'development'
+  : import.meta.env?.DEV ?? false;
+  
+const isDebugEnabled = typeof process !== 'undefined'
+  ? process.env.DEBUG === 'true'
+  : import.meta.env?.VITE_DEBUG === 'true';
 
 /**
  * Environment-aware logger
