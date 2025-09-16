@@ -171,15 +171,19 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
       <ExtractUserInput 
         label="User A"
-        bind:value={userA}
+        bind:selectedUserId={userA}
         placeholder="Enter username or ID"
         disabled={loading}
+        showSyncFeatures={false}
+        on:change={(e) => userA = e.detail}
       />
       <ExtractUserInput 
         label="User B"
-        bind:value={userB}
+        bind:selectedUserId={userB}
         placeholder="Enter username or ID"
         disabled={loading}
+        showSyncFeatures={false}
+        on:change={(e) => userB = e.detail}
       />
     </div>
     
