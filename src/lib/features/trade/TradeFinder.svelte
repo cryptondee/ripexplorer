@@ -229,12 +229,19 @@
       
       <!-- Filters -->
       <TradeFilters
-        {availableSets}
+        sortedAvailableSets={availableSets}
         {availableRarities}
         bind:selectedSet={filters.selectedSet}
         bind:selectedRarity={filters.selectedRarity}
         bind:selectedTradeType={filters.selectedTradeType}
         bind:showDuplicatesOnly={filters.showDuplicatesOnly}
+        userA={tradeResults.userA}
+        userB={tradeResults.userB}
+        getSetCompletion={(setId, user) => {
+          const owned = user === 'A' ? tradeResults.ownedBySetA : tradeResults.ownedBySetB;
+          const total = setTotals[setId] || 0;
+          return total > 0 ? Math.round((owned[setId] || 0) / total * 100) : 0;
+        }}
         on:setChange={handleSetChange}
         on:rarityChange={handleRarityChange}
         on:tradeTypeChange={handleTradeTypeChange}
@@ -252,13 +259,25 @@
       <!-- Set Summary -->
       {#if tradeResults.ownedBySetA && tradeResults.ownedBySetB}
         <SetSummaryTable
-          userA={tradeResults.userA}
-          userB={tradeResults.userB}
-          ownedBySetA={tradeResults.ownedBySetA}
-          ownedBySetB={tradeResults.ownedBySetB}
-          missingBySetA={tradeResults.missingBySetA}
-          missingBySetB={tradeResults.missingBySetB}
-          {setTotals}
+          title="📊 Collection Summary by Set"
+          rows={availableSets.map(set => ({
+            setName: set.name,
+            userAOwned: tradeResults.ownedBySetA[set.id] || 0,
+            userBOwned: tradeResults.ownedBySetB[set.id] || 0,
+            userAMissing: tradeResults.missingBySetA[set.id] || 0,
+            userBMissing: tradeResults.missingBySetB[set.id] || 0,
+            total: setTotals[set.id] || 0,
+            userACompletion: setTotals[set.id] ? Math.round(((tradeResults.ownedBySetA[set.id] || 0) / setTotals[set.id]) * 100) : 0,
+            userBCompletion: setTotals[set.id] ? Math.round(((tradeResults.ownedBySetB[set.id] || 0) / setTotals[set.id]) * 100) : 0
+          }))}
+          columns={[
+            { key: 'setName', header: 'Set', align: 'left' },
+            { key: 'userAOwned', header: `${tradeResults.userA?.username || 'User A'} Owned`, align: 'center' },
+            { key: 'userACompletion', header: 'Completion %', align: 'center', formatter: (row) => `${row.userACompletion}%` },
+            { key: 'userBOwned', header: `${tradeResults.userB?.username || 'User B'} Owned`, align: 'center' },
+            { key: 'userBCompletion', header: 'Completion %', align: 'center', formatter: (row) => `${row.userBCompletion}%` },
+            { key: 'total', header: 'Total Cards', align: 'center' }
+          ]}
         />
       {/if}
     </div>
