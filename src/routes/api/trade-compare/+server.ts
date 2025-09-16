@@ -15,12 +15,15 @@ async function getUserProfileForTrade(input: string, forceRefresh: boolean = fal
   // Check cache first unless force refresh
   if (!forceRefresh) {
     const cacheKey = CacheKeys.extraction(input);
-    const cachedResult = await redisCache.get(cacheKey);
+    const cachedResult = await redisCache.get(cacheKey) as any;
     
     if (cachedResult && cachedResult.extractedData) {
       logger.cache('HIT', `trade profile: ${input}`);
       return {
-        ...cachedResult,
+        username: cachedResult.username || 'Unknown',
+        id: cachedResult.resolvedUserId || null,
+        profile: cachedResult.extractedData.profile || null,
+        cards: cachedResult.extractedData.profile?.digital_cards || [],
         cached: true
       };
     }
@@ -69,22 +72,22 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
   ]);
   
   console.log(`Profile extraction complete:`);
-  console.log(`- ${profileA.username} (ID: ${profileA.id}): ${profileA.cards.length} cards`);
-  console.log(`- ${profileB.username} (ID: ${profileB.id}): ${profileB.cards.length} cards`);
+  console.log(`- ${profileA.username} (ID: ${profileA.id}): ${profileA.cards?.length || 0} cards`);
+  console.log(`- ${profileB.username} (ID: ${profileB.id}): ${profileB.cards?.length || 0} cards`);
   
   // Create user collections for trade analysis
   const collectionA = tradeAnalyzer.createUserCollection(
     profileA.username, 
     profileA.id, 
     profileA.profile, 
-    profileA.cards
+    profileA.cards || []
   );
   
   const collectionB = tradeAnalyzer.createUserCollection(
     profileB.username,
     profileB.id, 
     profileB.profile,
-    profileB.cards
+    profileB.cards || []
   );
   
   // Analyze trade opportunities
@@ -171,8 +174,8 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
     ownedBySetB,
     missingBySetA,
     missingBySetB,
-    rawCardsA: profileA.cards,
-    rawCardsB: profileB.cards
+    rawCardsA: profileA.cards || [],
+    rawCardsB: profileB.cards || []
   };
 }
 
@@ -200,8 +203,8 @@ export const POST: RequestHandler = async ({ request }) => {
     // Generate recommendations
     const recommendations = tradeAnalyzer.generateTradeRecommendations(tradeAnalysis, collectionA, collectionB);
     
-    logger.log('User A cards:', rawCardsA.length);
-    logger.log('User B cards:', rawCardsB.length);
+    logger.log('User A cards:', rawCardsA?.length || 0);
+    logger.log('User B cards:', rawCardsB?.length || 0);
     
     const responseData = {
       success: true,
@@ -210,14 +213,14 @@ export const POST: RequestHandler = async ({ request }) => {
         id: collectionA.id,
         totalCards: collectionA.ownedCards.size,
         profile: collectionA.profile,
-        allCards: rawCardsA
+        allCards: rawCardsA || []
       },
       userB: {
         username: collectionB.username,
         id: collectionB.id,
         totalCards: collectionB.ownedCards.size,
         profile: collectionB.profile,
-        allCards: rawCardsB
+        allCards: rawCardsB || []
       },
       tradeAnalysis,
       ownedBySetA,
@@ -262,8 +265,13 @@ export const GET: RequestHandler = async ({ url, request }) => {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '50');
     
+    // Validate required parameters
+    if (!userA || !userB) {
+      return json({ error: 'Both userA and userB are required' }, { status: 400 });
+    }
+    
     // Use the shared analysis function
-    let { tradeAnalysis, collectionA, collectionB } = await getTradeAnalysisForUsers(userA!, userB!, request);
+    let { tradeAnalysis, collectionA, collectionB } = await getTradeAnalysisForUsers(userA, userB, request);
     
     // Get available sets (needed for frontend)
     const availableSets = tradeAnalyzer.getAvailableSets(collectionA, collectionB);
@@ -271,7 +279,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
     // Filter by set(s) based on mode
     if (crossSet) {
       // Cross-set trading mode - filter by different sets for each user
-      tradeAnalysis = tradeAnalyzer.filterByCrossSets(tradeAnalysis, setA, setB);
+      tradeAnalysis = tradeAnalyzer.filterByCrossSets(tradeAnalysis, setA || undefined, setB || undefined);
     } else if (setId && setId !== 'all') {
       // Single set mode - filter by same set for both users
       tradeAnalysis = tradeAnalyzer.filterBySet(tradeAnalysis, setId);
