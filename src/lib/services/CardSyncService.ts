@@ -218,7 +218,7 @@ export class CardSyncService {
         isChase: cardData.is_chase || false,
         isReverse: cardData.is_reverse || false,
         isHolo: cardData.is_holo || false,
-        marketPrice: cardData.raw_price || null,
+        marketPrice: cardData.raw_price ? parseFloat(cardData.raw_price.toString()) : null,
         updatedAt: new Date()
       },
       create: {
@@ -239,7 +239,7 @@ export class CardSyncService {
         isChase: cardData.is_chase || false,
         isReverse: cardData.is_reverse || false,
         isHolo: cardData.is_holo || false,
-        marketPrice: cardData.raw_price || null
+        marketPrice: cardData.raw_price ? parseFloat(cardData.raw_price.toString()) : null
       }
     });
   }
