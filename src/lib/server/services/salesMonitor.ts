@@ -900,8 +900,27 @@ export class SalesMonitorService {
       console.log(`📋 Token URI for ${tokenId}:`, tokenURI);
       
       if (tokenURI) {
-        // The contract returns JSON data directly (not a URL)
         try {
+          // Handle URL-based metadata (older tokens)
+          if (typeof tokenURI === 'string' && tokenURI.startsWith('http')) {
+            console.log(`🔗 Token ${tokenId} returns URL, fetching: ${tokenURI}`);
+            try {
+              const response = await fetch(tokenURI);
+              if (response.ok) {
+                const metadata = await response.json();
+                console.log(`✅ Fetched metadata from URL for ${tokenId}:`, metadata);
+                return metadata;
+              } else {
+                console.log(`❌ Failed to fetch URL: ${response.status}`);
+                return null;
+              }
+            } catch (fetchError) {
+              console.error(`❌ Error fetching URL:`, fetchError.message);
+              return null;
+            }
+          }
+          
+          // Handle direct JSON metadata (newer tokens)
           const metadata = JSON.parse(tokenURI as string);
           console.log(`✅ Raw onchain metadata for ${tokenId}:`, metadata);
           

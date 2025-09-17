@@ -53,8 +53,21 @@ async function getOnchainMetadata(tokenId) {
     if (tokenURI) {
       // Handle cases where tokenURI is a URL instead of JSON
       if (typeof tokenURI === 'string' && tokenURI.startsWith('http')) {
-        console.log(`Token ${tokenId} returns URL instead of JSON: ${tokenURI}`);
-        return null; // Skip URL-based tokens for now
+        console.log(`Token ${tokenId} returns URL, fetching: ${tokenURI}`);
+        try {
+          const response = await fetch(tokenURI);
+          if (response.ok) {
+            const metadata = await response.json();
+            console.log(`✅ Fetched metadata from URL for token ${tokenId}`);
+            return metadata;
+          } else {
+            console.log(`❌ Failed to fetch URL: ${response.status}`);
+            return null;
+          }
+        } catch (fetchError) {
+          console.error(`❌ Error fetching URL:`, fetchError.message);
+          return null;
+        }
       }
       return JSON.parse(tokenURI);
     }
