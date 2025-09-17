@@ -149,11 +149,21 @@
   async function copyTradeSummary() {
     if (!tradeResults) return;
     
+    // Use selected cards when selection is enabled, otherwise use all filtered trades
+    let giveTradesToCopy = filteredTrades.filter(t => t.tradeType === 'give');
+    let receiveTradesToCopy = filteredTrades.filter(t => t.tradeType === 'receive');
+    
+    if (enableCardSelection) {
+      // Filter to only include selected cards
+      giveTradesToCopy = giveTradesToCopy.filter(trade => selectedGiveCards.has(trade.card.id));
+      receiveTradesToCopy = receiveTradesToCopy.filter(trade => selectedReceiveCards.has(trade.card.id));
+    }
+    
     const summary = tradeService.generateTradeSummary({
       userA: tradeResults.userA,
       userB: tradeResults.userB,
-      giveTrades: filteredTrades.filter(t => t.tradeType === 'give'),
-      receiveTrades: filteredTrades.filter(t => t.tradeType === 'receive'),
+      giveTrades: giveTradesToCopy,
+      receiveTrades: receiveTradesToCopy,
       filters: {
         setName: filters.selectedSet === 'all' ? 'All Sets' : 
                  availableSets.find(s => s.id === filters.selectedSet)?.name,
@@ -170,13 +180,90 @@
    * Handle card click to show modal
    */
   function handleCardClick(trade: any) {
-    if (trade?.card && tradeResults) {
-      const allCards = trade.userAHas 
-        ? tradeResults.userA?.allCards || []
-        : tradeResults.userB?.allCards || [];
+    if (trade && trade.card && tradeResults) {
+      // Determine which user's collection to use for duplicates
+      let allCards = [];
+      
+      if (trade.userAHas && trade.userBHas) {
+        // Both have it - show User A's duplicates by default
+        allCards = tradeResults.userA?.allCards || [];
+      } else if (trade.userAHas) {
+        // Only User A has this card
+        allCards = tradeResults.userA?.allCards || [];
+      } else if (trade.userBHas) {
+        // Only User B has this card
+        allCards = tradeResults.userB?.allCards || [];
+      }
       
       openCardModal(trade.card, allCards);
     }
+  }
+  
+  /**
+   * Card selection functions
+   */
+  function toggleCardSelection() {
+    enableCardSelection = !enableCardSelection;
+    if (!enableCardSelection) {
+      // Clear selections when disabling
+      selectedGiveCards.clear();
+      selectedReceiveCards.clear();
+      selectedGiveCards = selectedGiveCards;
+      selectedReceiveCards = selectedReceiveCards;
+    } else {
+      // Select all cards by default when enabling
+      const allGiveTrades = filteredTrades.filter(trade => trade.tradeType === 'give');
+      const allReceiveTrades = filteredTrades.filter(trade => trade.tradeType === 'receive');
+      
+      allGiveTrades.forEach(trade => selectedGiveCards.add(trade.card.id));
+      allReceiveTrades.forEach(trade => selectedReceiveCards.add(trade.card.id));
+      selectedGiveCards = selectedGiveCards;
+      selectedReceiveCards = selectedReceiveCards;
+    }
+  }
+  
+  function handleGiveCardSelection(event: CustomEvent<{ cardId: string; selected: boolean }>) {
+    const { cardId, selected } = event.detail;
+    if (selected) {
+      selectedGiveCards.add(cardId);
+    } else {
+      selectedGiveCards.delete(cardId);
+    }
+    selectedGiveCards = selectedGiveCards; // Trigger reactivity
+  }
+  
+  function handleReceiveCardSelection(event: CustomEvent<{ cardId: string; selected: boolean }>) {
+    const { cardId, selected } = event.detail;
+    if (selected) {
+      selectedReceiveCards.add(cardId);
+    } else {
+      selectedReceiveCards.delete(cardId);
+    }
+    selectedReceiveCards = selectedReceiveCards; // Trigger reactivity
+  }
+  
+  function handleGiveSelectAll(event: CustomEvent<boolean>) {
+    const selectAll = event.detail;
+    const giveTrades = filteredTrades.filter(trade => trade.tradeType === 'give');
+    
+    if (selectAll) {
+      giveTrades.forEach(trade => selectedGiveCards.add(trade.card.id));
+    } else {
+      giveTrades.forEach(trade => selectedGiveCards.delete(trade.card.id));
+    }
+    selectedGiveCards = selectedGiveCards; // Trigger reactivity
+  }
+  
+  function handleReceiveSelectAll(event: CustomEvent<boolean>) {
+    const selectAll = event.detail;
+    const receiveTrades = filteredTrades.filter(trade => trade.tradeType === 'receive');
+    
+    if (selectAll) {
+      receiveTrades.forEach(trade => selectedReceiveCards.add(trade.card.id));
+    } else {
+      receiveTrades.forEach(trade => selectedReceiveCards.delete(trade.card.id));
+    }
+    selectedReceiveCards = selectedReceiveCards; // Trigger reactivity
   }
 </script>
 
@@ -283,6 +370,35 @@
         }}
       />
       
+      <!-- Card Selection Toggle -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">🎯 Customize Trade Analysis</h3>
+            <p class="text-sm text-gray-600 mt-1">Select specific cards to include in trade calculations</p>
+          </div>
+          <button
+            type="button"
+            on:click={toggleCardSelection}
+            class="px-4 py-2 rounded-lg font-medium transition-colors {enableCardSelection 
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}"
+          >
+            {enableCardSelection ? '✓ Selection Enabled' : '📝 Enable Selection'}
+          </button>
+        </div>
+        
+        {#if enableCardSelection}
+          <div class="mt-4 p-3 bg-indigo-50 rounded-lg">
+            <p class="text-sm text-indigo-800">
+              <span class="font-medium">Selection Mode Active:</span> 
+              Use checkboxes to select which cards to include in trades. 
+              Deselected cards (grayed out) won't be included in trade calculations.
+            </p>
+          </div>
+        {/if}
+      </div>
+      
       <!-- Trade Tables -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <!-- Cards User A Can Give to User B (LEFT) -->
@@ -294,6 +410,8 @@
           enableSelection={enableCardSelection}
           selectedCards={selectedGiveCards}
           on:cardClick={handleCardClick}
+          on:selectionChange={handleGiveCardSelection}
+          on:selectAll={handleGiveSelectAll}
         />
         
         <!-- Cards User A Can Receive from User B (RIGHT) -->
@@ -305,6 +423,8 @@
           enableSelection={enableCardSelection}
           selectedCards={selectedReceiveCards}
           on:cardClick={handleCardClick}
+          on:selectionChange={handleReceiveCardSelection}
+          on:selectAll={handleReceiveSelectAll}
         />
       </div>
       
