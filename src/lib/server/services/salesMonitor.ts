@@ -5,7 +5,7 @@ import { createPublicClient, http, parseAbiItem, decodeEventLog, type Log } from
 import { logger } from '$lib/utils/logger.js';
 import { EXTERNAL_URLS } from '$lib/constants/urls.js';
 import { DEFAULT_HEADERS } from '$lib/constants/http.js';
-import { autoEnrichingSalesService } from '$lib/services/AutoEnrichingSalesService.js';
+import { cardSyncService } from '$lib/services/CardSyncService.js';
 import { prisma } from '$lib/server/db/client.js';
 import { userSyncService } from '$lib/server/services/userSync.js';
 import type { SalesEvent } from '$lib/types/sales.js';
@@ -604,15 +604,14 @@ export class SalesMonitorService {
         return null;
       }
       
-      // Use auto-enriching service for maximum enrichment
-      const enrichedData = await autoEnrichingSalesService.enrichSaleFromOnchain(onchainMetadata);
+      // Use direct enrichment with auto-downloading
+      const enrichedData = await this.enrichWithAutoDownload(onchainMetadata);
       
       console.log(`✅ Enhanced metadata for ${tokenId}:`, {
-        name: enrichedData.cardName,
-        set: enrichedData.cardSet,
-        rarity: enrichedData.cardRarity,
-        source: enrichedData.enrichmentSource,
-        setDownloaded: enrichedData.setDownloaded
+        name: enrichedData?.cardName,
+        set: enrichedData?.cardSet,
+        rarity: enrichedData?.cardRarity,
+        source: enrichedData?.enrichmentSource
       });
       
       return enrichedData;
@@ -621,6 +620,249 @@ export class SalesMonitorService {
       console.error(`❌ Error getting enhanced metadata for token ${tokenId}:`, error);
       return null;
     }
+  }
+
+  /**
+   * Enrich with auto-downloading capability
+   */
+  private async enrichWithAutoDownload(onchainMetadata: any): Promise<any> {
+    try {
+      // Extract identifiers from onchain metadata
+      const identifiers = this.extractIdentifiers(onchainMetadata);
+      console.log(`📋 Extracted identifiers:`, identifiers);
+      
+      // Check if we have this collection in our database
+      let hasCollection = await this.checkCollectionAvailability(identifiers.collectionName);
+      let setDownloaded = false;
+      
+      // If collection missing, try to download it
+      if (!hasCollection && identifiers.collectionName) {
+        const setId = this.mapCollectionToSetId(identifiers.collectionName);
+        if (setId) {
+          console.log(`📥 Collection missing, attempting to download set: ${setId}`);
+          setDownloaded = await this.downloadSetIfNeeded(setId);
+          
+          if (setDownloaded) {
+            hasCollection = await this.checkCollectionAvailability(identifiers.collectionName);
+            console.log(`🔄 Post-download availability: ${hasCollection}`);
+          }
+        }
+      }
+      
+      // Try database lookup if we have the collection
+      if (hasCollection) {
+        let dbCard = null;
+        
+        // For new format, try card_id lookup
+        if (identifiers.cardId) {
+          console.log(`🗄️ Looking up card_id: ${identifiers.cardId}`);
+          dbCard = await this.lookupCardById(identifiers.cardId);
+        }
+        
+        // For legacy format or if card_id lookup failed, try name + set lookup
+        if (!dbCard && onchainMetadata.name && identifiers.setName) {
+          console.log(`🔍 Searching by name: ${onchainMetadata.name}, set: ${identifiers.setName}`);
+          dbCard = await this.lookupCardByNameAndSet(onchainMetadata.name, identifiers.setName);
+        }
+        
+        if (dbCard) {
+          console.log(`✅ Found in database: ${dbCard.name}`);
+          return this.createEnrichedDataFromDB(dbCard, identifiers, onchainMetadata, setDownloaded);
+        }
+      }
+      
+      // Fallback to onchain data
+      console.log(`📦 Using onchain data only`);
+      return this.createEnrichedDataFromOnchain(identifiers, onchainMetadata);
+      
+    } catch (error) {
+      console.error('❌ Auto-enrichment failed:', error);
+      return this.createFallbackData(onchainMetadata);
+    }
+  }
+
+  private extractIdentifiers(metadata: any) {
+    // Handle new format (with attributes array)
+    if (metadata.attributes && Array.isArray(metadata.attributes)) {
+      const attributesMap = new Map();
+      metadata.attributes.forEach((attr: any) => {
+        if (attr.trait_type && attr.value !== undefined) {
+          attributesMap.set(attr.trait_type, attr.value);
+        }
+      });
+
+      return {
+        cardId: attributesMap.get('Card Id') || null,
+        serialNumber: attributesMap.get('Serial Number') || null,
+        collectionName: metadata.collection_name,
+        setName: attributesMap.get('Set') || null,
+        rarity: attributesMap.get('Rarity') || null,
+        isLegacyFormat: false
+      };
+    }
+    
+    // Handle legacy format (direct fields)
+    else {
+      console.log('📄 Detected legacy metadata format');
+      return {
+        cardId: null, // Legacy format doesn't have card_id
+        serialNumber: metadata.unique_id || null,
+        collectionName: metadata.set || null, // Use set as collection for legacy
+        setName: metadata.set || null,
+        rarity: metadata.rarity || null,
+        isLegacyFormat: true
+      };
+    }
+  }
+
+  private async checkCollectionAvailability(collectionName: string): Promise<boolean> {
+    if (!collectionName) return false;
+    
+    try {
+      const collectionToSetMap: Record<string, string[]> = {
+        '151': ['151', 'sv3pt5'],
+        'Paldean Fates': ['Paldean Fates', 'sv4pt5'],
+        'Obsidian Flames': ['Obsidian Flames', 'sv3'],
+        'Paradox Rift': ['Paradox Rift', 'sv4'],
+        'Temporal Forces': ['Temporal Forces', 'sv5'],
+        'Twilight Masquerade': ['Twilight Masquerade', 'sv6'],
+        'Shrouded Fable': ['Shrouded Fable', 'sv7'],
+        'Stellar Crown': ['Stellar Crown', 'sv8'],
+        'Surging Sparks': ['Surging Sparks', 'sv8pt5'],
+        'Prismatic Evolutions': ['Prismatic Evolutions', 'sv9'],
+        // Legacy format compatibility
+        'sv9': ['Prismatic Evolutions', 'sv9'],
+        'Base Set': ['Base Set', 'base1'],
+        'Jungle': ['Jungle', 'jungle'],
+        'Fossil': ['Fossil', 'fossil']
+      };
+
+      const possibleSetNames = collectionToSetMap[collectionName] || [collectionName];
+      
+      const cardCount = await prisma.card.count({
+        where: {
+          OR: [
+            { setName: { in: possibleSetNames } },
+            { setId: { in: possibleSetNames } }
+          ]
+        }
+      });
+
+      return cardCount > 0;
+    } catch (error) {
+      console.error(`Error checking collection availability:`, error);
+      return false;
+    }
+  }
+
+  private mapCollectionToSetId(collectionName: string): string | null {
+    const collectionToSetMap: Record<string, string> = {
+      '151': 'sv3pt5',
+      'Paldean Fates': 'sv4pt5',
+      'Obsidian Flames': 'sv3',
+      'Paradox Rift': 'sv4',
+      'Temporal Forces': 'sv5',
+      'Twilight Masquerade': 'sv6',
+      'Shrouded Fable': 'sv7',
+      'Stellar Crown': 'sv8',
+      'Surging Sparks': 'sv8pt5',
+      'Prismatic Evolutions': 'sv9',
+      'Base Set': 'base1',
+      'Jungle': 'jungle',
+      'Fossil': 'fossil'
+    };
+    
+    return collectionToSetMap[collectionName] || null;
+  }
+
+  private async downloadSetIfNeeded(setId: string): Promise<boolean> {
+    try {
+      console.log(`📥 Downloading set: ${setId}`);
+      const cardCount = await cardSyncService.syncSet(setId);
+      
+      if (cardCount > 0) {
+        console.log(`✅ Successfully downloaded ${cardCount} cards from ${setId}`);
+        return true;
+      } else {
+        console.log(`⚠️ No cards downloaded from ${setId}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`❌ Failed to download set ${setId}:`, error);
+      return false;
+    }
+  }
+
+  private async lookupCardById(cardId: string) {
+    try {
+      return await prisma.card.findUnique({
+        where: { id: cardId }
+      });
+    } catch (error) {
+      console.error(`Error looking up card ${cardId}:`, error);
+      return null;
+    }
+  }
+
+  private async lookupCardByNameAndSet(cardName: string, setName: string) {
+    try {
+      return await prisma.card.findFirst({
+        where: {
+          name: { contains: cardName },
+          OR: [
+            { setName: { contains: setName } },
+            { setId: { contains: setName } }
+          ]
+        }
+      });
+    } catch (error) {
+      console.error(`Error looking up card by name and set:`, error);
+      return null;
+    }
+  }
+
+  private createEnrichedDataFromDB(dbCard: any, identifiers: any, metadata: any, setDownloaded: boolean) {
+    const onchainImageUrl = metadata.image 
+      ? `https://d2hl7maqck52px.cloudfront.net/${metadata.image}`
+      : null;
+
+    return {
+      cardName: dbCard.name,
+      cardImage: dbCard.largeImageUrl || onchainImageUrl,
+      cardUniqueId: identifiers.serialNumber,
+      cardId: identifiers.cardId,
+      cardRarity: dbCard.rarity,
+      cardSet: dbCard.setName,
+      enrichmentSource: setDownloaded ? 'database_after_download' : 'database'
+    };
+  }
+
+  private createEnrichedDataFromOnchain(identifiers: any, metadata: any) {
+    const imageUrl = metadata.image 
+      ? `https://d2hl7maqck52px.cloudfront.net/${metadata.image}`
+      : null;
+
+    return {
+      cardName: metadata.name,
+      cardImage: imageUrl,
+      cardUniqueId: identifiers.serialNumber,
+      cardId: identifiers.cardId,
+      cardRarity: identifiers.rarity,
+      cardSet: identifiers.setName,
+      enrichmentSource: 'onchain'
+    };
+  }
+
+  private createFallbackData(metadata: any) {
+    return {
+      cardName: metadata.name || 'Unknown Card',
+      cardImage: null,
+      cardUniqueId: null,
+      cardId: null,
+      cardRarity: null,
+      cardSet: metadata.collection_name || null,
+      enrichmentSource: 'fallback'
+    };
   }
 
   /**
