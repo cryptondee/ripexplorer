@@ -624,12 +624,26 @@ export class SalesMonitorService {
 
   /**
    * Enrich with auto-downloading capability
+   * Handles both URL-fetched rich data and direct JSON limited data
    */
   private async enrichWithAutoDownload(onchainMetadata: any): Promise<any> {
     try {
+      // Determine metadata type and quality
+      const isRichMetadata = this.hasRichMetadata(onchainMetadata);
+      console.log(`📋 Metadata type: ${isRichMetadata ? 'RICH (URL-fetched)' : 'LIMITED (direct JSON)'}`);
+      
       // Extract identifiers from onchain metadata
       const identifiers = this.extractIdentifiers(onchainMetadata);
       console.log(`📋 Extracted identifiers:`, identifiers);
+      
+      // For LIMITED metadata (Scenario 2), prioritize database reconciliation
+      if (!isRichMetadata) {
+        console.log(`🔍 LIMITED metadata detected - prioritizing database reconciliation`);
+        const dbEnrichedData = await this.attemptDatabaseReconciliation(onchainMetadata, identifiers);
+        if (dbEnrichedData) {
+          return dbEnrichedData;
+        }
+      }
       
       // Check if we have this collection in our database
       let hasCollection = await this.checkCollectionAvailability(identifiers.collectionName);
@@ -678,6 +692,60 @@ export class SalesMonitorService {
     } catch (error) {
       console.error('❌ Auto-enrichment failed:', error);
       return this.createFallbackData(onchainMetadata);
+    }
+  }
+
+  /**
+   * Check if metadata is rich (URL-fetched) or limited (direct JSON)
+   */
+  private hasRichMetadata(metadata: any): boolean {
+    // Rich metadata typically has more fields and structured data
+    return !!(metadata.attributes && Array.isArray(metadata.attributes)) ||
+           !!(metadata.collection_name && metadata.image) ||
+           !!(metadata.description && metadata.external_url);
+  }
+
+  /**
+   * Attempt database reconciliation for limited metadata (Scenario 2)
+   * This is crucial for direct JSON tokens that lack rich data
+   */
+  private async attemptDatabaseReconciliation(onchainMetadata: any, identifiers: any): Promise<any | null> {
+    try {
+      console.log(`🔍 Attempting database reconciliation for limited metadata`);
+      
+      // Multiple lookup strategies for limited data
+      let dbCard = null;
+      
+      // Strategy 1: Exact name + set match
+      if (onchainMetadata.name && identifiers.setName) {
+        console.log(`🎯 Strategy 1: Exact name + set lookup`);
+        dbCard = await this.lookupCardByNameAndSet(onchainMetadata.name, identifiers.setName);
+      }
+      
+      // Strategy 2: Name-only search across all sets (if set lookup failed)
+      if (!dbCard && onchainMetadata.name) {
+        console.log(`🎯 Strategy 2: Name-only search across all sets`);
+        dbCard = await this.lookupCardByNameOnly(onchainMetadata.name);
+      }
+      
+      // Strategy 3: Unique ID lookup (if available)
+      if (!dbCard && onchainMetadata.unique_id) {
+        console.log(`🎯 Strategy 3: Unique ID search`);
+        // This would require adding unique_id to our database schema
+        // For now, skip this strategy
+      }
+      
+      if (dbCard) {
+        console.log(`✅ Database reconciliation successful: ${dbCard.name} (${dbCard.setName})`);
+        return this.createEnrichedDataFromDB(dbCard, identifiers, onchainMetadata, false);
+      }
+      
+      console.log(`❌ Database reconciliation failed - no matches found`);
+      return null;
+      
+    } catch (error) {
+      console.error('❌ Database reconciliation error:', error);
+      return null;
     }
   }
 
@@ -821,6 +889,23 @@ export class SalesMonitorService {
     }
   }
 
+  private async lookupCardByNameOnly(cardName: string) {
+    try {
+      return await prisma.card.findFirst({
+        where: {
+          name: { contains: cardName }
+        },
+        orderBy: [
+          // Prefer exact matches
+          { name: 'asc' }
+        ]
+      });
+    } catch (error) {
+      console.error(`Error looking up card by name only:`, error);
+      return null;
+    }
+  }
+
   private createEnrichedDataFromDB(dbCard: any, identifiers: any, metadata: any, setDownloaded: boolean) {
     const onchainImageUrl = metadata.image 
       ? `https://d2hl7maqck52px.cloudfront.net/${metadata.image}`
@@ -920,15 +1005,14 @@ export class SalesMonitorService {
             }
           }
           
-          // Handle direct JSON metadata (newer tokens)
+          // Handle direct JSON metadata (newer tokens) - LIMITED DATA
           const metadata = JSON.parse(tokenURI as string);
           console.log(`✅ Raw onchain metadata for ${tokenId}:`, metadata);
+          console.log(`⚠️ Direct JSON detected - limited data, will reconcile with database`);
           
-          // Transform onchain metadata to our expected format
-          const transformedMetadata = this.transformOnchainMetadata(metadata);
-          console.log(`🔄 Transformed metadata for ${tokenId}:`, transformedMetadata);
-          
-          return transformedMetadata;
+          // Return raw metadata for enrichment process
+          // The enrichWithAutoDownload will handle database reconciliation
+          return metadata;
         } catch (parseError) {
           console.error(`❌ Error parsing tokenURI JSON for ${tokenId}:`, parseError);
         }
