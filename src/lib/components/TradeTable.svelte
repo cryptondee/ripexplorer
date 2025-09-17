@@ -211,9 +211,12 @@
       <tbody class="bg-white divide-y divide-gray-200">
         {#each sortedTrades as trade}
           <tr 
-            class="{getRowHighlighting(trade)}" 
+            class="{getRowHighlighting(trade)} cursor-pointer hover:bg-gray-50 transition-colors" 
             style="{getRowStyle(trade)}"
-            on:click={() => handleCardClick(trade)}
+            on:click={() => {
+              console.log('Card clicked:', trade.card.name);
+              handleCardClick(trade);
+            }}
           >
             {#if enableSelection}
               <td class="px-4 py-3 whitespace-nowrap w-10" on:click|stopPropagation>

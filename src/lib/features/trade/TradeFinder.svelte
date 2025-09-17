@@ -178,6 +178,7 @@
    * Handle card click to show modal
    */
   function handleCardClick(trade: any) {
+    console.log('handleCardClick called with:', trade);
     if (trade && trade.card && tradeResults) {
       // Determine which user's collection to use for duplicates
       let allCards = [];
@@ -193,7 +194,10 @@
         allCards = tradeResults.userB?.allCards || [];
       }
       
+      console.log('Opening modal for card:', trade.card.name, 'with', allCards.length, 'cards');
       openCardModal(trade.card, allCards);
+    } else {
+      console.log('handleCardClick failed - missing data:', { trade: !!trade, card: !!trade?.card, tradeResults: !!tradeResults });
     }
   }
   
@@ -315,6 +319,8 @@
       <TradeQuickActions
         userA={tradeResults.userA}
         userB={tradeResults.userB}
+        tradeAnalysis={tradeResults.tradeAnalysis}
+        on:copyGeneralSummary={copyTradeSummary}
       />
       
       <!-- Filters -->
