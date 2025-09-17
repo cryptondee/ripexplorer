@@ -4,6 +4,7 @@
  */
 
 import { logger } from '$lib/utils/logger.js';
+import { prisma } from '$lib/server/db/client.js';
 
 export interface EnrichedCardData {
   id: string;
@@ -57,8 +58,8 @@ export class CardEnrichmentService {
       return this.pendingRequests.get(cacheKey)!;
     }
 
-    // Create new request
-    const request = this.fetchCardMetadata(partialCard);
+    // Create new request with local database priority
+    const request = this.fetchCardMetadataWithDatabase(partialCard);
     this.pendingRequests.set(cacheKey, request);
 
     try {
@@ -73,7 +74,81 @@ export class CardEnrichmentService {
   }
 
   /**
-   * Fetch complete card metadata from rip.fun API
+   * Fetch card metadata with local database priority
+   */
+  private async fetchCardMetadataWithDatabase(partialCard: {
+    name?: string;
+    uniqueId?: string;
+    tokenId: string;
+    rarity?: string;
+    set?: string;
+    image?: string;
+    card_id?: string;
+  }): Promise<EnrichedCardData | null> {
+    try {
+      // PRIORITY 1: Check local database first
+      if (partialCard.card_id) {
+        logger.log(`Checking local database for card_id: ${partialCard.card_id}`);
+        const dbCard = await prisma.card.findUnique({
+          where: { id: partialCard.card_id }
+        });
+        
+        if (dbCard) {
+          logger.log(`Found card in local database: ${dbCard.name}`);
+          return this.transformDatabaseCard(dbCard, partialCard);
+        }
+      }
+      
+      // PRIORITY 2: Search by name and set in database
+      if (partialCard.name && partialCard.set) {
+        logger.log(`Searching local database by name: ${partialCard.name}, set: ${partialCard.set}`);
+        const dbCard = await prisma.card.findFirst({
+          where: {
+            name: { contains: partialCard.name, mode: 'insensitive' },
+            setName: { contains: partialCard.set, mode: 'insensitive' }
+          }
+        });
+        
+        if (dbCard) {
+          logger.log(`Found card in local database by search: ${dbCard.name}`);
+          return this.transformDatabaseCard(dbCard, partialCard);
+        }
+      }
+      
+      // PRIORITY 3: Fall back to original API-based method
+      logger.log(`Card not found in local database, falling back to API`);
+      return await this.fetchCardMetadata(partialCard);
+      
+    } catch (error) {
+      logger.error('Error checking local database:', error);
+      // Fall back to API method
+      return await this.fetchCardMetadata(partialCard);
+    }
+  }
+
+  /**
+   * Transform database card to enriched format
+   */
+  private transformDatabaseCard(dbCard: any, partialCard: any): EnrichedCardData {
+    return {
+      id: dbCard.id,
+      name: dbCard.name,
+      card_number: dbCard.cardNumber || '',
+      rarity: dbCard.rarity || 'Unknown',
+      set_id: dbCard.setId || '',
+      set_name: dbCard.setName || 'Unknown Set',
+      large_image_url: dbCard.largeImageUrl || '',
+      small_image_url: dbCard.smallImageUrl || '',
+      uniqueId: partialCard.uniqueId || '',
+      tokenId: partialCard.tokenId,
+      // Backward compatibility
+      image: dbCard.largeImageUrl || '',
+      set: dbCard.setName || 'Unknown Set'
+    };
+  }
+
+  /**
+   * Fetch complete card metadata from rip.fun API (fallback method)
    */
   private async fetchCardMetadata(partialCard: {
     name?: string;

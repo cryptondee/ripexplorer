@@ -49,6 +49,53 @@ model SyncStatus {
   @@map("sync_status")
 }
 
+// Master card database - stores all card data from rip.fun
+model Card {
+  id              String   @id // e.g., "charizard-base-set-4"
+  name            String   // "Charizard"
+  cardNumber      String?  // "4"
+  rarity          String?  // "Rare Holo"
+  setId           String   // "base1"
+  setName         String?  // "Base Set"
+  largeImageUrl   String?  // Full resolution image
+  smallImageUrl   String?  // Thumbnail image
+  hp              Int?
+  types           String?  // JSON array as string
+  supertype       String?  // "Pokémon"
+  subtype         String?  // "Basic"
+  illustrator     String?
+  tcgplayerId     String?
+  isChase         Boolean? @default(false)
+  isReverse       Boolean? @default(false)
+  isHolo          Boolean? @default(false)
+  marketPrice     Float?   // raw_price from API
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Indexes for fast lookups
+  @@index([setId])
+  @@index([name])
+  @@index([rarity])
+  @@map("cards")
+}
+
+// Set information
+model CardSet {
+  id              String   @id // e.g., "base1"
+  name            String   // "Base Set"
+  series          String?  // "Base"
+  totalCards      Int?     // Total cards in set
+  releaseDate     String?  // Release date
+  
+  // Sync metadata
+  lastSynced      DateTime @default(now())
+  cardCount       Int      @default(0) // Actual cards we have
+  
+  @@map("card_sets")
+}
+
 model SalesEvent {
   id              String   @id @default(cuid())
   transactionHash String   
