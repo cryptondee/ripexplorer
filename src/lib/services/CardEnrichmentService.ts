@@ -3,7 +3,7 @@
  * Fetches complete card metadata to create uniform card data across all pages
  */
 
-import { logger } from '$lib/utils/logger';
+import { logger } from '$lib/utils/logger.js';
 
 export interface EnrichedCardData {
   id: string;

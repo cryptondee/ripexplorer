@@ -1,5 +1,5 @@
 // Modal Store - Centralized state management for card detail modal
-import { writable, get } from 'svelte/stores';
+import { writable, get } from 'svelte/store';
 import { buildRipCardUrl, slugifyName } from '$lib/utils/url';
 import { adaptCard, toModalFormat, isSameCard, type UniformCardData } from '$lib/utils/cardAdapter';
 
@@ -67,6 +67,3 @@ export function closeCardModal() {
   selectedCardIndex.set(0);
   isCardModalOpen.set(false);
 }
-
-// Import get for internal use
-import { get } from 'svelte/store';

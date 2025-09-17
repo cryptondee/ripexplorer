@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db/client.js';
 import { salesMonitor } from '$lib/server/services/salesMonitor.js';
 import { CURRENCY_ADDRESSES, CURRENCY_DECIMALS } from '$lib/constants/sales';
-import { cardEnrichmentService } from '$lib/services/CardEnrichmentService';
+import { cardEnrichmentService } from '$lib/services/CardEnrichmentService.js';
 
 // Helper function to parse timeframe
 function getTimeframeDate(timeframe: string): Date {
