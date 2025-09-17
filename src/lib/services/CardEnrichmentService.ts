@@ -108,7 +108,7 @@ export class CardEnrichmentService {
           const onchainData = await onchainResponse.json();
           logger.log(`Successfully fetched onchain data for ${partialCard.uniqueId}`);
           
-          // Extract card_id from onchain metadata
+          // Check if this has the newer attributes format
           const attributesMap = new Map();
           if (onchainData.attributes && Array.isArray(onchainData.attributes)) {
             onchainData.attributes.forEach((attr: any) => {
@@ -116,18 +116,22 @@ export class CardEnrichmentService {
                 attributesMap.set(attr.trait_type, attr.value);
               }
             });
-          }
-          
-          const cardId = attributesMap.get('Card Id');
-          if (cardId) {
-            logger.log(`Extracted card_id from onchain data: ${cardId}`);
-            // Now fetch the full card data using the card_id
-            const cardResponse = await fetch(`https://api.rip.fun/cards/${cardId}`);
-            if (cardResponse.ok) {
-              const cardData = await cardResponse.json();
-              logger.log(`Successfully fetched full card data for ${cardId}`);
-              return this.transformApiResponse(cardData, partialCard);
+            
+            const cardId = attributesMap.get('Card Id');
+            if (cardId) {
+              logger.log(`Extracted card_id from onchain data: ${cardId}`);
+              // Now fetch the full card data using the card_id
+              const cardResponse = await fetch(`https://api.rip.fun/cards/${cardId}`);
+              if (cardResponse.ok) {
+                const cardData = await cardResponse.json();
+                logger.log(`Successfully fetched full card data for ${cardId}`);
+                return this.transformApiResponse(cardData, partialCard);
+              }
             }
+          } else {
+            // Handle older format - use onchain data directly
+            logger.log(`Using onchain data directly (older format)`);
+            return this.transformOnchainResponse(onchainData, partialCard);
           }
         }
         
@@ -161,6 +165,31 @@ export class CardEnrichmentService {
       logger.error('Error fetching card metadata:', error);
       return this.createFallbackEnrichedData(partialCard);
     }
+  }
+
+  /**
+   * Transform onchain response to enriched card data (for older format)
+   */
+  private transformOnchainResponse(onchainData: any, partialCard: any): EnrichedCardData {
+    const imageUrl = onchainData.image 
+      ? `https://d2hl7maqck52px.cloudfront.net/${onchainData.image}`
+      : null;
+
+    return {
+      id: partialCard.uniqueId || `token-${partialCard.tokenId}`,
+      name: onchainData.name || partialCard.name || `Token #${partialCard.tokenId}`,
+      card_number: '', // Not available in onchain metadata
+      rarity: onchainData.rarity || partialCard.rarity || 'Unknown',
+      set_id: '', // Not available in onchain metadata
+      set_name: onchainData.collection_name || partialCard.set || 'Unknown Set',
+      large_image_url: imageUrl || '',
+      small_image_url: imageUrl || '',
+      uniqueId: partialCard.uniqueId || onchainData.unique_id || '',
+      tokenId: partialCard.tokenId,
+      // Backward compatibility
+      image: imageUrl || '',
+      set: onchainData.collection_name || partialCard.set || 'Unknown Set'
+    };
   }
 
   /**
