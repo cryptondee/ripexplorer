@@ -1,5 +1,7 @@
 // Modal Store - Centralized state management for card detail modal
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/stores';
+import { buildRipCardUrl, slugifyName } from '$lib/utils/url';
+import { adaptCard, toModalFormat, isSameCard, type UniformCardData } from '$lib/utils/cardAdapter';
 
 // ==========================================
 // MODAL STATE STORES
@@ -15,39 +17,40 @@ export const selectedCardIndex = writable(0);
 // ==========================================
 
 export function openCardModal(card: any, allCards: any[] = []) {
-  // Handle both flat (trade-finder) and nested (extract) structures
-  const getCardId = (c: any) => {
-    // Try nested structure first (extract page)
-    if (c.card?.id) return c.card.id;
-    // Then try flat structure (trade-finder)
-    if (c.id) return c.id;
-    // Fallback to name
-    return c.card?.name || c.name || '';
-  };
-  
-  const getCardNumber = (c: any) => {
-    return c.card?.card_number || c.card_number || '';
-  };
-  
-  // Find all duplicate cards (same card ID and card number)
-  const cardId = getCardId(card);
-  const cardNumber = getCardNumber(card);
-  const cardKey = `${cardId}_${cardNumber}`;
-  
-  const duplicates = allCards.filter(c => {
-    const cId = getCardId(c);
-    const cNum = getCardNumber(c);
-    const cKey = `${cId}_${cNum}`;
-    return cKey === cardKey;
-  });
-  
-  // If we found duplicates, use them, otherwise just the single card
-  const cardsToShow = duplicates.length > 1 ? duplicates : [card];
-  
-  allCardsForModal.set(cardsToShow);
-  selectedCard.set(cardsToShow[0]);
-  selectedCardIndex.set(0);
-  isCardModalOpen.set(true);
+  try {
+    // Adapt the main card to uniform format
+    const uniformCard = adaptCard(card);
+    
+    // Adapt all cards to uniform format for duplicate detection
+    const uniformAllCards = allCards.map(c => {
+      try {
+        return adaptCard(c);
+      } catch (error) {
+        console.warn('Failed to adapt card for modal:', error);
+        return null;
+      }
+    }).filter(Boolean) as UniformCardData[];
+
+    // Find all duplicate cards using the uniform adapter
+    const duplicates = uniformAllCards.filter(c => isSameCard(uniformCard, c));
+
+    // Convert back to modal format
+    const cardsToShow = duplicates.length > 1 
+      ? duplicates.map(toModalFormat)
+      : [toModalFormat(uniformCard)];
+
+    allCardsForModal.set(cardsToShow);
+    selectedCard.set(cardsToShow[0]);
+    selectedCardIndex.set(0);
+    isCardModalOpen.set(true);
+  } catch (error) {
+    console.error('Error opening card modal:', error);
+    // Fallback to original behavior
+    allCardsForModal.set([card]);
+    selectedCard.set(card);
+    selectedCardIndex.set(0);
+    isCardModalOpen.set(true);
+  }
 }
 
 export function setSelectedCardIndex(index: number) {

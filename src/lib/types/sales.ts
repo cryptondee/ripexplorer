@@ -24,12 +24,19 @@ export interface SalesEvent {
     username?: string;
   };
   card: {
+    // Enriched card data (matches extract/trade format)
+    id?: string;
     name?: string;
-    image?: string;
+    card_number?: string;
     rarity?: string;
-    set?: string;
+    set_id?: string;
+    large_image_url?: string;
+    small_image_url?: string;
     uniqueId?: string;
     tokenId: string;
+    // Backward compatibility
+    image?: string;
+    set?: string;
   };
   price: {
     wei: string;

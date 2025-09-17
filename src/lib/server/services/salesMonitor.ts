@@ -1,7 +1,10 @@
-import WebSocket from 'ws';
-import { prisma } from '../db/client.js';
-import { alchemyService } from './alchemy.js';
-import { userSyncService } from './userSync.js';
+import { EventEmitter } from 'events';
+import { WebSocketServer } from 'ws';
+import { createPublicClient, http, parseAbiItem, decodeEventLog, type Log } from 'viem';
+import { base } from 'viem/chains';
+import { prisma } from '$lib/server/db/client.js';
+import { cardEnrichmentService } from '$lib/services/CardEnrichmentService.js';
+import type { SalesEvent } from '$lib/types/sales.js';
 
 // Contract configuration based on your working WebSocket code
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
@@ -348,8 +351,18 @@ export class SalesMonitorService {
 
       console.log('💾 Purchase stored in database:', salesEvent.id);
 
+      // Enrich card data for uniform structure
+      const enrichedCard = await cardEnrichmentService.enrichCardData({
+        name: salesEvent.cardName || undefined,
+        uniqueId: salesEvent.cardUniqueId || undefined,
+        tokenId: salesEvent.tokenId,
+        rarity: salesEvent.cardRarity || undefined,
+        set: salesEvent.cardSet || undefined,
+        image: salesEvent.cardImage || undefined
+      });
+
       // Create enriched event for subscribers
-      const enrichedEvent: EnrichedSalesEvent = {
+      const enrichedEvent: SalesEvent = {
         id: salesEvent.id,
         transactionHash: salesEvent.transactionHash,
         blockNumber: salesEvent.blockNumber.toString(),
@@ -361,7 +374,22 @@ export class SalesMonitorService {
           address: salesEvent.sellerAddress,
           username: salesEvent.sellerUsername || undefined
         },
-        card: {
+        card: enrichedCard ? {
+          // Enriched data (matches extract/trade format)
+          id: enrichedCard.id,
+          name: enrichedCard.name,
+          card_number: enrichedCard.card_number,
+          rarity: enrichedCard.rarity,
+          set_id: enrichedCard.set_id,
+          large_image_url: enrichedCard.large_image_url,
+          small_image_url: enrichedCard.small_image_url,
+          uniqueId: enrichedCard.uniqueId,
+          tokenId: enrichedCard.tokenId,
+          // Backward compatibility
+          image: enrichedCard.image,
+          set: enrichedCard.set_name
+        } : {
+          // Fallback to original data
           name: salesEvent.cardName || undefined,
           image: salesEvent.cardImage || undefined,
           rarity: salesEvent.cardRarity || undefined,

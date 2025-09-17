@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db/client.js';
 import { salesMonitor } from '$lib/server/services/salesMonitor.js';
 import { CURRENCY_ADDRESSES, CURRENCY_DECIMALS } from '$lib/constants/sales';
+import { cardEnrichmentService } from '$lib/services/CardEnrichmentService';
 
 // Helper function to parse timeframe
 function getTimeframeDate(timeframe: string): Date {
@@ -96,38 +97,65 @@ export const GET: RequestHandler = async ({ url }) => {
       take: limit
     });
 
-    // Format response
-    const formattedSales = sales.map(sale => ({
-      id: sale.id,
-      transactionHash: sale.transactionHash,
-      blockNumber: sale.blockNumber.toString(),
-      buyer: {
-        address: sale.buyerAddress,
-        username: sale.buyerUsername || undefined
-      },
-      seller: {
-        address: sale.sellerAddress,
-        username: sale.sellerUsername || undefined
-      },
-      card: {
+    // Enrich card data for uniform structure
+    const enrichedSales = await Promise.all(sales.map(async (sale) => {
+      // Enrich card data to match extract/trade format
+      const enrichedCard = await cardEnrichmentService.enrichCardData({
         name: sale.cardName || undefined,
-        image: sale.cardImage || undefined,
+        uniqueId: sale.cardUniqueId || undefined,
+        tokenId: sale.tokenId,
         rarity: sale.cardRarity || undefined,
         set: sale.cardSet || undefined,
-        uniqueId: sale.cardUniqueId || undefined,
-        tokenId: sale.tokenId
-      },
-      price: {
-        wei: sale.price,
-        currency: sale.currency,
-        formatted: formatPrice(sale.price, sale.currency)
-      },
-      timestamp: sale.timestamp.toISOString()
+        image: sale.cardImage || undefined
+      });
+
+      return {
+        id: sale.id,
+        transactionHash: sale.transactionHash,
+        blockNumber: sale.blockNumber.toString(),
+        buyer: {
+          address: sale.buyerAddress,
+          username: sale.buyerUsername || undefined
+        },
+        seller: {
+          address: sale.sellerAddress,
+          username: sale.sellerUsername || undefined
+        },
+        card: enrichedCard ? {
+          // Enriched data (matches extract/trade format)
+          id: enrichedCard.id,
+          name: enrichedCard.name,
+          card_number: enrichedCard.card_number,
+          rarity: enrichedCard.rarity,
+          set_id: enrichedCard.set_id,
+          large_image_url: enrichedCard.large_image_url,
+          small_image_url: enrichedCard.small_image_url,
+          uniqueId: enrichedCard.uniqueId,
+          tokenId: enrichedCard.tokenId,
+          // Backward compatibility
+          image: enrichedCard.image,
+          set: enrichedCard.set_name
+        } : {
+          // Fallback to original data
+          name: sale.cardName || undefined,
+          image: sale.cardImage || undefined,
+          rarity: sale.cardRarity || undefined,
+          set: sale.cardSet || undefined,
+          uniqueId: sale.cardUniqueId || undefined,
+          tokenId: sale.tokenId
+        },
+        price: {
+          wei: sale.price,
+          currency: sale.currency,
+          formatted: formatPrice(sale.price, sale.currency)
+        },
+        timestamp: sale.timestamp.toISOString()
+      };
     }));
 
     return json({
       success: true,
-      sales: formattedSales,
+      sales: enrichedSales,
       pagination: {
         page,
         limit,
