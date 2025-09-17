@@ -43,6 +43,7 @@ export class CardEnrichmentService {
     rarity?: string;
     set?: string;
     image?: string;
+    card_id?: string; // Added for onchain metadata support
   }): Promise<EnrichedCardData | null> {
     const cacheKey = partialCard.uniqueId || partialCard.tokenId;
     
@@ -81,10 +82,25 @@ export class CardEnrichmentService {
     rarity?: string;
     set?: string;
     image?: string;
+    card_id?: string; // Added for onchain metadata support
   }): Promise<EnrichedCardData | null> {
     try {
-      // Try to fetch from rip.fun API using uniqueId
+      // PRIORITY 1: Use card_id from onchain metadata (most reliable)
+      if (partialCard.card_id) {
+        logger.log(`Fetching card data using card_id: ${partialCard.card_id}`);
+        const response = await fetch(`https://api.rip.fun/cards/${partialCard.card_id}`);
+        if (response.ok) {
+          const cardData = await response.json();
+          logger.log(`Successfully fetched card data for ${partialCard.card_id}:`, cardData);
+          return this.transformApiResponse(cardData, partialCard);
+        } else {
+          logger.warn(`Failed to fetch card data for ${partialCard.card_id}, status: ${response.status}`);
+        }
+      }
+
+      // PRIORITY 2: Try to fetch from rip.fun API using uniqueId
       if (partialCard.uniqueId) {
+        logger.log(`Fetching card data using uniqueId: ${partialCard.uniqueId}`);
         const response = await fetch(`https://api.rip.fun/cards/${partialCard.uniqueId}`);
         if (response.ok) {
           const cardData = await response.json();
@@ -92,8 +108,9 @@ export class CardEnrichmentService {
         }
       }
 
-      // Fallback: search by name and set
+      // PRIORITY 3: Fallback search by name and set
       if (partialCard.name && partialCard.set) {
+        logger.log(`Searching card by name: ${partialCard.name}, set: ${partialCard.set}`);
         const searchResponse = await fetch(
           `https://api.rip.fun/cards/search?name=${encodeURIComponent(partialCard.name)}&set=${encodeURIComponent(partialCard.set)}`
         );
@@ -106,6 +123,7 @@ export class CardEnrichmentService {
       }
 
       // Final fallback: create enriched data from available info
+      logger.warn(`No card data found for token ${partialCard.tokenId}, using fallback`);
       return this.createFallbackEnrichedData(partialCard);
 
     } catch (error) {

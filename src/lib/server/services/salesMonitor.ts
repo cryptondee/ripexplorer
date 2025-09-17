@@ -339,6 +339,7 @@ export class SalesMonitorService {
           cardName: cardMetadata?.name || null,
           cardImage: cardMetadata?.image || null,
           cardUniqueId: cardMetadata?.unique_id || null,
+          cardId: cardMetadata?.card_id || null, // Store the card_id from onchain metadata
           cardRarity: cardMetadata?.rarity || null,
           cardSet: cardMetadata?.set || null,
           packetId: cardMetadata?.packet_id?.toString() || null,
@@ -358,7 +359,8 @@ export class SalesMonitorService {
         tokenId: salesEvent.tokenId,
         rarity: salesEvent.cardRarity || undefined,
         set: salesEvent.cardSet || undefined,
-        image: salesEvent.cardImage || undefined
+        image: salesEvent.cardImage || undefined,
+        card_id: cardMetadata?.card_id || undefined // Pass the card_id from onchain metadata
       });
 
       // Create enriched event for subscribers
@@ -618,8 +620,13 @@ export class SalesMonitorService {
         // The contract returns JSON data directly (not a URL)
         try {
           const metadata = JSON.parse(tokenURI as string);
-          console.log(`✅ Card metadata for ${tokenId}:`, metadata);
-          return metadata;
+          console.log(`✅ Raw onchain metadata for ${tokenId}:`, metadata);
+          
+          // Transform onchain metadata to our expected format
+          const transformedMetadata = this.transformOnchainMetadata(metadata);
+          console.log(`🔄 Transformed metadata for ${tokenId}:`, transformedMetadata);
+          
+          return transformedMetadata;
         } catch (parseError) {
           console.error(`❌ Error parsing tokenURI JSON for ${tokenId}:`, parseError);
         }
@@ -629,6 +636,70 @@ export class SalesMonitorService {
     } catch (error) {
       console.error(`❌ Error fetching card metadata for token ${tokenId}:`, error);
       return null;
+    }
+  }
+
+  /**
+   * Transform onchain metadata to our expected format
+   * Parses the attributes array to extract card information
+   */
+  private transformOnchainMetadata(onchainMetadata: any): any {
+    try {
+      // Extract attributes into a map for easier access
+      const attributesMap = new Map();
+      if (onchainMetadata.attributes && Array.isArray(onchainMetadata.attributes)) {
+        onchainMetadata.attributes.forEach((attr: any) => {
+          if (attr.trait_type && attr.value !== undefined) {
+            attributesMap.set(attr.trait_type, attr.value);
+          }
+        });
+      }
+
+      // Extract the card ID from attributes (e.g., "sv3pt5-104")
+      const cardId = attributesMap.get('Card Id');
+      const serialNumber = attributesMap.get('Serial Number'); // e.g., "CARD-RIP2CDF287728A0"
+      const setName = attributesMap.get('Set'); // e.g., "151"
+      const series = attributesMap.get('Series'); // e.g., "Scarlet & Violet"
+      
+      // Build full image URL
+      const imageUrl = onchainMetadata.image 
+        ? `https://d2hl7maqck52px.cloudfront.net/${onchainMetadata.image}`
+        : null;
+
+      return {
+        // Basic card info
+        name: onchainMetadata.name || 'Unknown Card',
+        image: imageUrl,
+        unique_id: serialNumber,
+        
+        // Card details from attributes
+        card_id: cardId, // This is the key for rip.fun compatibility!
+        set: setName,
+        series: series,
+        collection_name: onchainMetadata.collection_name,
+        
+        // Token info
+        token_id: onchainMetadata.token_info?.token_id,
+        
+        // Additional metadata
+        description: onchainMetadata.description,
+        external_url: onchainMetadata.external_url,
+        
+        // Reveal state
+        is_revealed: onchainMetadata.reveal_state?.is_revealed || false,
+        revealed_at: onchainMetadata.reveal_state?.revealed_at,
+        
+        // Raw attributes for debugging
+        _raw_attributes: onchainMetadata.attributes
+      };
+    } catch (error) {
+      console.error('Error transforming onchain metadata:', error);
+      return {
+        name: onchainMetadata.name || 'Unknown Card',
+        image: onchainMetadata.image,
+        unique_id: null,
+        _error: 'Failed to parse attributes'
+      };
     }
   }
 

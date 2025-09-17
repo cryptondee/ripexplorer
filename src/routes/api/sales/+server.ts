@@ -106,7 +106,8 @@ export const GET: RequestHandler = async ({ url }) => {
         tokenId: sale.tokenId,
         rarity: sale.cardRarity || undefined,
         set: sale.cardSet || undefined,
-        image: sale.cardImage || undefined
+        image: sale.cardImage || undefined,
+        card_id: sale.cardId || undefined // Use the stored card_id from onchain metadata
       });
 
       return {

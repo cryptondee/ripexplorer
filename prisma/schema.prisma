@@ -65,6 +65,7 @@ model SalesEvent {
   cardName        String?  // "Plusle"
   cardImage       String?  // "cards/sv4/CARD-RIP1XP7EYGDGKE80_1752702477766.png"
   cardUniqueId    String?  // "CARD-RIP1XP7EYGDGKE80"  
+  cardId          String?  // "sv3pt5-104" - Card ID from onchain metadata
   cardRarity      String?  // "Common"
   cardSet         String?  // "Paradox Rift"
   packetId        String?  // "4553"
