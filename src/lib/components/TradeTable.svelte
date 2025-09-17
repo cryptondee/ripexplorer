@@ -213,10 +213,7 @@
           <tr 
             class="{getRowHighlighting(trade)} cursor-pointer hover:bg-gray-50 transition-colors" 
             style="{getRowStyle(trade)}"
-            on:click={() => {
-              console.log('Card clicked:', trade.card.name);
-              handleCardClick(trade);
-            }}
+            on:click={() => handleCardClick(trade)}
           >
             {#if enableSelection}
               <td class="px-4 py-3 whitespace-nowrap w-10" on:click|stopPropagation>

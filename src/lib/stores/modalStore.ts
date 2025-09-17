@@ -15,7 +15,6 @@ export const selectedCardIndex = writable(0);
 // ==========================================
 
 export function openCardModal(card: any, allCards: any[] = []) {
-  console.log('openCardModal called with:', card, 'allCards length:', allCards.length);
   // Handle both flat (trade-finder) and nested (extract) structures
   const getCardId = (c: any) => {
     // Try nested structure first (extract page)
@@ -35,16 +34,12 @@ export function openCardModal(card: any, allCards: any[] = []) {
   const cardNumber = getCardNumber(card);
   const cardKey = `${cardId}_${cardNumber}`;
   
-  console.log('Modal: Looking for duplicates with key:', cardKey);
-  
   const duplicates = allCards.filter(c => {
     const cId = getCardId(c);
     const cNum = getCardNumber(c);
     const cKey = `${cId}_${cNum}`;
     return cKey === cardKey;
   });
-  
-  console.log('Modal: Found duplicates:', duplicates.length);
   
   // If we found duplicates, use them, otherwise just the single card
   const cardsToShow = duplicates.length > 1 ? duplicates : [card];
@@ -53,7 +48,6 @@ export function openCardModal(card: any, allCards: any[] = []) {
   selectedCard.set(cardsToShow[0]);
   selectedCardIndex.set(0);
   isCardModalOpen.set(true);
-  console.log('Modal state set - isOpen: true, selectedCard:', cardsToShow[0]?.name || cardsToShow[0]?.card?.name);
 }
 
 export function setSelectedCardIndex(index: number) {
