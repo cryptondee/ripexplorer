@@ -10,9 +10,12 @@ export interface FilterOptions {
 
 export interface FilterState {
   selectedSet: string;
+  selectedSetA: string;
+  selectedSetB: string;
   selectedRarity: string;
   selectedTradeType: string;
   showDuplicatesOnly: boolean;
+  enableCrossSetTrading: boolean;
   currentPage: number;
   itemsPerPage: number;
 }
@@ -29,9 +32,12 @@ export function useFilters(
   // Initialize filter state with defaults
   let filters: FilterState = {
     selectedSet: 'all',
+    selectedSetA: 'all',
+    selectedSetB: 'all',
     selectedRarity: 'all',
     selectedTradeType: 'all',
     showDuplicatesOnly: false,
+    enableCrossSetTrading: false,
     currentPage: 1,
     itemsPerPage: 50,
     ...initialState
@@ -63,9 +69,12 @@ export function useFilters(
    */
   async function resetFilters(): Promise<void> {
     filters.selectedSet = 'all';
+    filters.selectedSetA = 'all';
+    filters.selectedSetB = 'all';
     filters.selectedRarity = 'all';
     filters.selectedTradeType = 'all';
     filters.showDuplicatesOnly = false;
+    filters.enableCrossSetTrading = false;
     filters.currentPage = 1;
     
     if (onFilterChange) {

@@ -106,7 +106,14 @@
         userB,
         page: filters.currentPage,
         limit: filters.itemsPerPage,
-        set: filters.selectedSet === 'all' ? undefined : filters.selectedSet
+        // Handle cross-set trading vs single set
+        ...(filters.enableCrossSetTrading ? {
+          crossSet: true,
+          setA: filters.selectedSetA === 'all' ? undefined : filters.selectedSetA,
+          setB: filters.selectedSetB === 'all' ? undefined : filters.selectedSetB
+        } : {
+          set: filters.selectedSet === 'all' ? undefined : filters.selectedSet
+        })
       });
       
       let trades = data.trades || [];
@@ -242,9 +249,12 @@
         sortedAvailableSets={availableSets}
         {availableRarities}
         bind:selectedSet={filters.selectedSet}
+        bind:selectedSetA={filters.selectedSetA}
+        bind:selectedSetB={filters.selectedSetB}
         bind:selectedRarity={filters.selectedRarity}
         bind:selectedTradeType={filters.selectedTradeType}
         bind:showDuplicatesOnly={filters.showDuplicatesOnly}
+        bind:enableCrossSetTrading={filters.enableCrossSetTrading}
         userA={tradeResults.userA}
         userB={tradeResults.userB}
         getSetCompletion={(setId, user) => {
@@ -257,6 +267,18 @@
         on:tradeTypeChange={(e) => handleTradeTypeChange(e.detail)}
         on:duplicatesToggle={(e) => {
           filters.showDuplicatesOnly = e.detail;
+          loadFilteredTrades();
+        }}
+        on:setAChange={(e) => {
+          filters.selectedSetA = e.detail;
+          loadFilteredTrades();
+        }}
+        on:setBChange={(e) => {
+          filters.selectedSetB = e.detail;
+          loadFilteredTrades();
+        }}
+        on:crossSetToggle={(e) => {
+          filters.enableCrossSetTrading = e.detail;
           loadFilteredTrades();
         }}
       />
