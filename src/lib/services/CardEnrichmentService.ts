@@ -120,13 +120,21 @@ export class CardEnrichmentService {
             const cardId = attributesMap.get('Card Id');
             if (cardId) {
               logger.log(`Extracted card_id from onchain data: ${cardId}`);
-              // Now fetch the full card data using the card_id
+              // Try to fetch the full card data using the card_id
               const cardResponse = await fetch(`https://api.rip.fun/cards/${cardId}`);
               if (cardResponse.ok) {
                 const cardData = await cardResponse.json();
                 logger.log(`Successfully fetched full card data for ${cardId}`);
                 return this.transformApiResponse(cardData, partialCard);
+              } else {
+                logger.warn(`rip.fun API failed for ${cardId}, using onchain data`);
+                // Fallback to onchain data even for newer format
+                return this.transformOnchainResponse(onchainData, partialCard);
               }
+            } else {
+              // No card_id found, use onchain data directly
+              logger.log(`No card_id in attributes, using onchain data directly`);
+              return this.transformOnchainResponse(onchainData, partialCard);
             }
           } else {
             // Handle older format - use onchain data directly
