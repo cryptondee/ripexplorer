@@ -9,8 +9,6 @@
   import TradeTable from '$lib/components/TradeTable.svelte';
   import TradeFilters from '$lib/components/TradeFilters.svelte';
   import TradeQuickActions from '$lib/components/TradeQuickActions.svelte';
-  import TradeValueAnalysis from '$lib/components/TradeValueAnalysis.svelte';
-  import TradeSummaryCards from '$lib/components/TradeSummaryCards.svelte';
   import SetSummaryTable from '$lib/components/trade/SetSummaryTable.svelte';
   import { openCardModal } from '$lib/stores/modalStore';
   
@@ -319,16 +317,6 @@
         userB={tradeResults.userB}
         tradeAnalysis={tradeResults.tradeAnalysis}
         on:copyGeneralSummary={copyTradeSummary}
-      />
-      
-      <!-- Summary Cards -->
-      <TradeSummaryCards tradeSummary={tradeResults.tradeAnalysis?.summary} />
-      
-      <!-- Value Analysis -->
-      <TradeValueAnalysis 
-        tradeAnalysis={tradeResults.tradeAnalysis}
-        userA={tradeResults.userA}
-        userB={tradeResults.userB}
       />
       
       <!-- Filters -->
