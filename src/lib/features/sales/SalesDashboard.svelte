@@ -11,6 +11,7 @@
   import { logger } from '$lib/utils/logger';
   import { DEFAULT_FILTERS, SALES_LIMITS } from '$lib/constants/sales';
   import type { SalesFilters as ISalesFilters, SalesEvent, SalesMonitorStatus } from '$lib/types/sales';
+  import { openCardModal } from '$lib/stores/modalStore';
   
   // State
   let filters: ISalesFilters = { ...DEFAULT_FILTERS };
@@ -88,6 +89,17 @@
     activeTab = tab;
     if (tab === 'historical') {
       loadHistoricalSales();
+    }
+  }
+  
+  /**
+   * Handle card click to show modal
+   */
+  function handleCardClick(sale: SalesEvent) {
+    if (sale && sale.card) {
+      // For sales, we don't have access to full user collections
+      // so we'll just show the single card
+      openCardModal(sale.card, []);
     }
   }
 </script>
@@ -182,14 +194,24 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             {#each historicalSales as sale}
-              <tr class="hover:bg-gray-50">
+              <tr 
+                class="hover:bg-gray-50 cursor-pointer transition-colors"
+                on:click={() => handleCardClick(sale)}
+                role="button"
+                tabindex="0"
+                on:keydown={(e) => e.key === 'Enter' && handleCardClick(sale)}
+              >
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
                     {#if sale.card?.image}
-                      <img src={sale.card.image} alt={sale.card.name} class="h-10 w-10 rounded-lg mr-3" />
+                      <img 
+                        src={sale.card.image} 
+                        alt={sale.card.name} 
+                        class="h-10 w-10 rounded-lg mr-3 hover:shadow-md transition-shadow" 
+                      />
                     {/if}
                     <div>
-                      <div class="text-sm font-medium text-gray-900">
+                      <div class="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors">
                         {sale.card?.name || 'Unknown Card'}
                       </div>
                       <div class="text-sm {getRarityColor(sale.card?.rarity)}">
@@ -213,7 +235,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {formatTimestamp(sale.timestamp)}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" on:click|stopPropagation>
                   <a 
                     href={EXTERNAL_URLS.BASESCAN.TX(sale.transactionHash)}
                     target="_blank"

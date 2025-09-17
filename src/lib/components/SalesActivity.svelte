@@ -4,6 +4,7 @@
   import { EXTERNAL_URLS } from '$lib/constants/urls.js';
   import { SALES_LIMITS, CONNECTION_SETTINGS } from '$lib/constants/sales';
   import type { SalesEvent, ConnectionStatus } from '$lib/types/sales';
+  import { openCardModal } from '$lib/stores/modalStore';
   import { createEventDispatcher } from 'svelte';
 
   export let showLiveEvents = true;
@@ -99,6 +100,17 @@
     // Add to beginning of array and limit to maxEvents
     events = [newEvent, ...events.slice(0, maxEvents - 1)];
   }
+  
+  /**
+   * Handle card click to show modal
+   */
+  function handleCardClick(event: SalesEvent) {
+    if (event && event.card) {
+      // For live sales, we don't have access to full user collections
+      // so we'll just show the single card
+      openCardModal(event.card, []);
+    }
+  }
 
 </script>
 
@@ -151,13 +163,19 @@
       </div>
     {:else}
       {#each events as event}
-        <div class="px-6 py-4 hover:bg-gray-50 transition-colors">
+        <div 
+          class="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
+          on:click={() => handleCardClick(event)}
+          role="button"
+          tabindex="0"
+          on:keydown={(e) => e.key === 'Enter' && handleCardClick(event)}
+        >
           <div class="flex items-start justify-between">
             <!-- Left Side: Card Info -->
             <div class="flex-1 min-w-0">
               <div class="flex items-center space-x-2">
                 <!-- Card Name -->
-                <h4 class="text-sm font-medium text-gray-900 truncate">
+                <h4 class="text-sm font-medium text-gray-900 truncate hover:text-indigo-600 transition-colors">
                   {event.card.name || `Token #${event.card.tokenId}`}
                 </h4>
                 
@@ -188,6 +206,7 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-indigo-600 hover:text-indigo-900"
+                  on:click|stopPropagation
                 >
                   View TX
                 </a>
