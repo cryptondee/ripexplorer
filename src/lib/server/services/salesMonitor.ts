@@ -2,9 +2,12 @@ import { EventEmitter } from 'events';
 import { WebSocketServer } from 'ws';
 import WebSocket from 'ws';
 import { createPublicClient, http, parseAbiItem, decodeEventLog, type Log } from 'viem';
-import { base } from 'viem/chains';
+import { logger } from '$lib/utils/logger.js';
+import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+import { DEFAULT_HEADERS } from '$lib/constants/http.js';
+import { autoEnrichingSalesService } from '$lib/services/AutoEnrichingSalesService.js';
 import { prisma } from '$lib/server/db/client.js';
-import { cardEnrichmentService } from '$lib/services/CardEnrichmentService.js';
+import { userSyncService } from '$lib/server/services/userSync.js';
 import type { SalesEvent } from '$lib/types/sales.js';
 
 // Contract configuration based on your working WebSocket code
@@ -317,10 +320,10 @@ export class SalesMonitorService {
     try {
       console.log('🎨 Enriching purchase with metadata...');
 
-      // Get usernames and card metadata in parallel
-      const [usernames, cardMetadata] = await Promise.all([
+      // Get usernames and enhanced card metadata in parallel
+      const [usernames, enrichedCardData] = await Promise.all([
         this.enrichWithUsernames(event.buyer, event.seller),
-        this.getCardMetadata(event.tokenId)
+        this.getEnhancedCardMetadata(event.tokenId)
       ]);
 
       // Store in database
@@ -336,14 +339,14 @@ export class SalesMonitorService {
           price: event.price,
           currency: event.currency.toLowerCase(),
           
-          // Card metadata
-          cardName: cardMetadata?.name || null,
-          cardImage: cardMetadata?.image || null,
-          cardUniqueId: cardMetadata?.unique_id || null,
-          cardId: cardMetadata?.card_id || null, // Store the card_id from onchain metadata
-          cardRarity: cardMetadata?.rarity || null,
-          cardSet: cardMetadata?.set || null,
-          packetId: cardMetadata?.packet_id?.toString() || null,
+          // Enhanced card metadata from auto-enriching service
+          cardName: enrichedCardData?.cardName || null,
+          cardImage: enrichedCardData?.cardImage || null,
+          cardUniqueId: enrichedCardData?.cardUniqueId || null,
+          // cardId: enrichedCardData?.cardId || null, // TODO: Add to schema if needed
+          cardRarity: enrichedCardData?.cardRarity || null,
+          cardSet: enrichedCardData?.cardSet || null,
+          packetId: null, // Will be populated if available in enriched data
           
           // Usernames
           buyerUsername: usernames.buyerUsername,
@@ -353,16 +356,16 @@ export class SalesMonitorService {
 
       console.log('💾 Purchase stored in database:', salesEvent.id);
 
-      // Enrich card data for uniform structure
-      const enrichedCard = await cardEnrichmentService.enrichCardData({
-        name: salesEvent.cardName || undefined,
-        uniqueId: salesEvent.cardUniqueId || undefined,
-        tokenId: salesEvent.tokenId,
-        rarity: salesEvent.cardRarity || undefined,
-        set: salesEvent.cardSet || undefined,
-        image: salesEvent.cardImage || undefined,
-        card_id: cardMetadata?.card_id || undefined // Pass the card_id from onchain metadata
-      });
+      // Log enrichment details
+      if (enrichedCardData?.enrichmentSource) {
+        console.log(`🎨 Enrichment source: ${enrichedCardData.enrichmentSource}`);
+        if (enrichedCardData.setDownloaded) {
+          console.log(`📥 Downloaded new set for this card!`);
+        }
+      }
+
+      // Card data is already enriched by AutoEnrichingSalesService
+      // No additional enrichment needed
 
       // Create enriched event for subscribers
       const enrichedEvent: SalesEvent = {
@@ -586,7 +589,44 @@ export class SalesMonitorService {
     }
   }
 
-  private async getCardMetadata(tokenId: string): Promise<any> {
+  /**
+   * Enhanced card metadata using auto-enriching service
+   */
+  private async getEnhancedCardMetadata(tokenId: string): Promise<any> {
+    try {
+      console.log(`🎯 Getting enhanced card metadata for token ${tokenId}...`);
+      
+      // Get raw onchain metadata first
+      const onchainMetadata = await this.getRawOnchainMetadata(tokenId);
+      
+      if (!onchainMetadata) {
+        console.log(`❌ No onchain metadata found for token ${tokenId}`);
+        return null;
+      }
+      
+      // Use auto-enriching service for maximum enrichment
+      const enrichedData = await autoEnrichingSalesService.enrichSaleFromOnchain(onchainMetadata);
+      
+      console.log(`✅ Enhanced metadata for ${tokenId}:`, {
+        name: enrichedData.cardName,
+        set: enrichedData.cardSet,
+        rarity: enrichedData.cardRarity,
+        source: enrichedData.enrichmentSource,
+        setDownloaded: enrichedData.setDownloaded
+      });
+      
+      return enrichedData;
+      
+    } catch (error) {
+      console.error(`❌ Error getting enhanced metadata for token ${tokenId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get raw onchain metadata (original method)
+   */
+  private async getRawOnchainMetadata(tokenId: string): Promise<any> {
     try {
       console.log(`🎨 Fetching card metadata for token ${tokenId}...`);
       

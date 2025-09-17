@@ -1,0 +1,67 @@
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { autoEnrichingSalesService } from '$lib/services/AutoEnrichingSalesService.js';
+import { cardSyncService } from '$lib/services/CardSyncService.js';
+
+export const POST: RequestHandler = async () => {
+  try {
+    console.log('🚀 Starting preload of popular sets via API...');
+    
+    // Get initial stats
+    const initialStats = await cardSyncService.getSyncStats();
+    
+    // Run the preload
+    await autoEnrichingSalesService.preloadPopularSets();
+    
+    // Get final stats
+    const finalStats = await cardSyncService.getSyncStats();
+    
+    return json({
+      success: true,
+      message: 'Popular sets preloaded successfully',
+      stats: {
+        initial: initialStats,
+        final: finalStats,
+        cardsAdded: finalStats.totalCards - initialStats.totalCards,
+        setsAdded: finalStats.totalSets - initialStats.totalSets
+      }
+    });
+  } catch (error) {
+    console.error('Preload error:', error);
+    return json(
+      {
+        success: false,
+        error: 'Failed to preload popular sets',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+};
+
+export const GET: RequestHandler = async () => {
+  try {
+    const stats = await cardSyncService.getSyncStats();
+    
+    // Estimate enrichment coverage
+    const estimatedCoverage = Math.min(Math.round((stats.totalCards / 10000) * 100), 95);
+    
+    return json({
+      success: true,
+      stats,
+      estimatedEnrichmentRate: `${estimatedCoverage}%`,
+      recommendation: stats.totalCards < 1000 
+        ? 'Consider running preload to improve sales enrichment'
+        : 'Good coverage for sales enrichment'
+    });
+  } catch (error) {
+    console.error('Error getting preload stats:', error);
+    return json(
+      {
+        success: false,
+        error: 'Failed to get preload stats'
+      },
+      { status: 500 }
+    );
+  }
+};
