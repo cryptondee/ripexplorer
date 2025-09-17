@@ -1,5 +1,8 @@
 import type { RequestHandler } from './$types';
-import { salesMonitor, type EnrichedSalesEvent } from '$lib/server/services/salesMonitor.js';
+import { salesMonitorService } from '$lib/server/services/index.js';
+
+// TODO: Update EnrichedSalesEvent type to match new architecture
+type EnrichedSalesEvent = any;
 
 export const GET: RequestHandler = async ({ request }) => {
   // Set up Server-Sent Events headers
@@ -68,7 +71,7 @@ export const GET: RequestHandler = async ({ request }) => {
       }
 
       // Subscribe to sales events
-      unsubscribe = salesMonitor.subscribe((saleEvent: EnrichedSalesEvent) => {
+      unsubscribe = salesMonitorService.on('sale', (saleEvent: EnrichedSalesEvent) => {
         if (isClosed) return;
         
         const eventData = {
@@ -86,7 +89,7 @@ export const GET: RequestHandler = async ({ request }) => {
         const keepAlive = `data: ${JSON.stringify({
           type: 'keepalive',
           timestamp: new Date().toISOString(),
-          status: salesMonitor.getStatus()
+          status: salesMonitorService.getStatus()
         })}\n\n`;
         
         if (!safeEnqueue(keepAlive)) {

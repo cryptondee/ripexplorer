@@ -1,4 +1,4 @@
-import { salesMonitor } from './services/salesMonitor.js';
+import { salesMonitorService } from './services/index.js';
 
 let initialized = false;
 
@@ -18,7 +18,7 @@ export async function initializeServices() {
     const apiKey = process.env.ALCHEMY_API_KEY;
     if (apiKey) {
       console.log('🎯 Starting sales monitor...');
-      await salesMonitor.startMonitoring();
+      await salesMonitorService.startMonitoring();
       console.log('✅ Sales monitor started successfully');
     } else {
       console.warn('⚠️ ALCHEMY_API_KEY not found - sales monitoring disabled');
@@ -41,7 +41,7 @@ export function shutdownServices() {
   console.log('🛑 Shutting down services...');
   
   try {
-    salesMonitor.stopMonitoring();
+    salesMonitorService.stopMonitoring();
     console.log('✅ Sales monitor stopped');
   } catch (error) {
     console.error('❌ Error stopping sales monitor:', error);

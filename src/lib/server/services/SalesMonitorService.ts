@@ -295,8 +295,36 @@ export class SalesMonitorService extends EventEmitter {
         }
       }
 
-      // Broadcast to connected clients
-      this.broadcastSalesEvent(salesEvent);
+      // Create enriched event for broadcasting and emission
+      const enrichedEvent = {
+        id: salesEvent.id,
+        transactionHash: salesEvent.transactionHash,
+        blockNumber: salesEvent.blockNumber.toString(),
+        buyer: {
+          address: salesEvent.buyerAddress,
+          username: salesEvent.buyerUsername || undefined
+        },
+        seller: {
+          address: salesEvent.sellerAddress,
+          username: salesEvent.sellerUsername || undefined
+        },
+        card: {
+          name: salesEvent.cardName || undefined,
+          image: salesEvent.cardImage || undefined,
+          rarity: salesEvent.cardRarity || undefined,
+          set: salesEvent.cardSet || undefined,
+          uniqueId: salesEvent.cardUniqueId || undefined
+        },
+        price: salesEvent.price,
+        currency: salesEvent.currency,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Broadcast to WebSocket clients
+      this.broadcastToWebSocketClients(enrichedEvent);
+      
+      // Emit event for subscribers (like SSE endpoints)
+      this.emit('sale', enrichedEvent);
       
     } catch (error) {
       logger.error('❌ Error enriching and storing purchase:', error);
@@ -304,34 +332,10 @@ export class SalesMonitorService extends EventEmitter {
   }
 
   /**
-   * Broadcast sales event to connected clients
+   * Broadcast to WebSocket clients
    */
-  private broadcastSalesEvent(salesEvent: any): void {
+  private broadcastToWebSocketClients(enrichedEvent: any): void {
     if (!this.wsServer) return;
-    
-    const enrichedEvent = {
-      id: salesEvent.id,
-      transactionHash: salesEvent.transactionHash,
-      blockNumber: salesEvent.blockNumber.toString(),
-      buyer: {
-        address: salesEvent.buyerAddress,
-        username: salesEvent.buyerUsername || undefined
-      },
-      seller: {
-        address: salesEvent.sellerAddress,
-        username: salesEvent.sellerUsername || undefined
-      },
-      card: {
-        name: salesEvent.cardName || undefined,
-        image: salesEvent.cardImage || undefined,
-        rarity: salesEvent.cardRarity || undefined,
-        set: salesEvent.cardSet || undefined,
-        uniqueId: salesEvent.cardUniqueId || undefined
-      },
-      price: salesEvent.price,
-      currency: salesEvent.currency,
-      timestamp: new Date().toISOString()
-    };
 
     const message = JSON.stringify({
       type: 'new_sale',

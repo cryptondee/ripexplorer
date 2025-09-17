@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db/client.js';
-import { salesMonitor } from '$lib/server/services/salesMonitor.js';
+import { salesMonitorService } from '$lib/server/services/index.js';
 import { CURRENCY_ADDRESSES, CURRENCY_DECIMALS } from '$lib/constants/sales';
 import { cardEnrichmentService } from '$lib/services/CardEnrichmentService.js';
 
@@ -192,29 +192,29 @@ export const POST: RequestHandler = async ({ request }) => {
 
     if (action === 'start') {
       // Start the sales monitor
-      await salesMonitor.startMonitoring();
+      await salesMonitorService.startMonitoring();
       
       return json({
         success: true,
         message: 'Sales monitoring started',
-        status: salesMonitor.getStatus()
+        status: salesMonitorService.getStatus()
       });
 
     } else if (action === 'stop') {
       // Stop the sales monitor
-      salesMonitor.stopMonitoring();
+      salesMonitorService.stopMonitoring();
       
       return json({
         success: true,
         message: 'Sales monitoring stopped',
-        status: salesMonitor.getStatus()
+        status: salesMonitorService.getStatus()
       });
 
     } else if (action === 'status') {
       // Get current status
       return json({
         success: true,
-        status: salesMonitor.getStatus()
+        status: salesMonitorService.getStatus()
       });
 
     } else {
