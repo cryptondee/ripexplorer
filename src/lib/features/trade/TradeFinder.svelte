@@ -380,7 +380,7 @@
           titleColor="text-green-600"
           enableSelection={enableCardSelection}
           selectedCards={selectedGiveCards}
-          on:cardClick={handleCardClick}
+          on:cardClick={(e) => handleCardClick(e.detail)}
           on:selectionChange={handleGiveCardSelection}
           on:selectAll={handleGiveSelectAll}
         />
@@ -393,7 +393,7 @@
           titleColor="text-blue-600"
           enableSelection={enableCardSelection}
           selectedCards={selectedReceiveCards}
-          on:cardClick={handleCardClick}
+          on:cardClick={(e) => handleCardClick(e.detail)}
           on:selectionChange={handleReceiveCardSelection}
           on:selectAll={handleReceiveSelectAll}
         />
