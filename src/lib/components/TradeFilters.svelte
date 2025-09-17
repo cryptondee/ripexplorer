@@ -95,8 +95,31 @@
   }
   
   // Computed values for summary display
-  $: selectedGiveCount = enableCardSelection ? selectedGiveCards.size : filteredTrades.filter(t => t.tradeType === 'give').length;
-  $: selectedReceiveCount = enableCardSelection ? selectedReceiveCards.size : filteredTrades.filter(t => t.tradeType === 'receive').length;
+  $: giveTrades = filteredTrades.filter(t => t.tradeType === 'give');
+  $: receiveTrades = filteredTrades.filter(t => t.tradeType === 'receive');
+  
+  $: selectedGiveTrades = enableCardSelection 
+    ? giveTrades.filter(t => selectedGiveCards.has(t.card.id))
+    : giveTrades;
+  $: selectedReceiveTrades = enableCardSelection 
+    ? receiveTrades.filter(t => selectedReceiveCards.has(t.card.id))
+    : receiveTrades;
+    
+  $: selectedGiveCount = selectedGiveTrades.length;
+  $: selectedReceiveCount = selectedReceiveTrades.length;
+  
+  $: selectedGiveValue = selectedGiveTrades.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0);
+  $: selectedReceiveValue = selectedReceiveTrades.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0);
+  $: tradeBalance = selectedReceiveValue - selectedGiveValue;
+  
+  // Format currency helper
+  function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  }
 </script>
 
 <div class="bg-white rounded-lg shadow-md p-8 mb-8">
@@ -249,22 +272,44 @@
     {/if}
     
     <!-- Trade Summary Actions -->
-    <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
-      <div class="text-sm text-gray-600">
-        <span class="font-medium">Trade Summary:</span>
-        {selectedGiveCount} cards to give • {selectedReceiveCount} cards to receive
-        {#if enableCardSelection}
-          <span class="text-indigo-600">(selected cards only)</span>
-        {/if}
+    <div class="bg-gray-50 rounded-lg p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm text-gray-600">
+          <span class="font-medium">Trade Summary:</span>
+          {selectedGiveCount} cards to give • {selectedReceiveCount} cards to receive
+          {#if enableCardSelection}
+            <span class="text-indigo-600">(selected cards only)</span>
+          {/if}
+        </div>
+        <button
+          type="button"
+          on:click={handleCopyTradeSummary}
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          disabled={selectedGiveCount === 0 && selectedReceiveCount === 0}
+        >
+          📋 Copy Trade Summary
+        </button>
       </div>
-      <button
-        type="button"
-        on:click={handleCopyTradeSummary}
-        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        disabled={selectedGiveCount === 0 && selectedReceiveCount === 0}
-      >
-        📋 Copy Trade Summary
-      </button>
+      
+      <!-- Value Summary -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div class="bg-white rounded-lg p-3 border border-orange-200">
+          <div class="text-orange-600 font-medium">🎁 Giving Value</div>
+          <div class="text-lg font-bold text-orange-700">{formatCurrency(selectedGiveValue)}</div>
+        </div>
+        <div class="bg-white rounded-lg p-3 border border-green-200">
+          <div class="text-green-600 font-medium">💰 Receiving Value</div>
+          <div class="text-lg font-bold text-green-700">{formatCurrency(selectedReceiveValue)}</div>
+        </div>
+        <div class="bg-white rounded-lg p-3 border {tradeBalance >= 0 ? 'border-green-200' : 'border-red-200'}">
+          <div class="{tradeBalance >= 0 ? 'text-green-600' : 'text-red-600'} font-medium">
+            ⚖️ Trade Balance
+          </div>
+          <div class="text-lg font-bold {tradeBalance >= 0 ? 'text-green-700' : 'text-red-700'}">
+            {tradeBalance >= 0 ? '+' : ''}{formatCurrency(tradeBalance)}
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
