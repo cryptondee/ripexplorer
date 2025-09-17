@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db/client.js';
 import { salesMonitor } from '$lib/server/services/salesMonitor.js';
+import { CURRENCY_ADDRESSES, CURRENCY_DECIMALS } from '$lib/constants/sales';
 
 // Helper function to parse timeframe
 function getTimeframeDate(timeframe: string): Date {
@@ -26,17 +27,13 @@ function formatPrice(priceWei: string, currency: string): string {
   try {
     const price = BigInt(priceWei);
     
-    // Common currency addresses on Base
-    const USDC_ADDRESS = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
-    const ETH_ADDRESS = '0x0000000000000000000000000000000000000000';
-
-    if (currency.toLowerCase() === USDC_ADDRESS.toLowerCase()) {
-      // USDC has 6 decimals
-      const usdcAmount = Number(price) / 1e6;
+    if (currency.toLowerCase() === CURRENCY_ADDRESSES.USDC.toLowerCase()) {
+      // USDC formatting
+      const usdcAmount = Number(price) / Math.pow(10, CURRENCY_DECIMALS.USDC);
       return `$${usdcAmount.toFixed(2)}`;
-    } else if (currency.toLowerCase() === ETH_ADDRESS.toLowerCase()) {
-      // ETH has 18 decimals
-      const ethAmount = Number(price) / 1e18;
+    } else if (currency.toLowerCase() === CURRENCY_ADDRESSES.ETH.toLowerCase()) {
+      // ETH formatting
+      const ethAmount = Number(price) / Math.pow(10, CURRENCY_DECIMALS.ETH);
       return `${ethAmount.toFixed(4)} ETH`;
     } else {
       // Unknown currency, show raw Wei

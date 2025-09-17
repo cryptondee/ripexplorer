@@ -6,26 +6,22 @@
   import LoadingSpinner from '$lib/components/ui/LoadingSpinner.svelte';
   import ErrorMessage from '$lib/components/ui/ErrorMessage.svelte';
   import { salesService } from '$lib/services/SalesService';
-  import { formatAddress, formatCurrency } from '$lib/utils/format';
+  import { formatAddress, formatTimestamp, getRarityColor } from '$lib/utils/format';
   import { EXTERNAL_URLS } from '$lib/constants/urls';
   import { logger } from '$lib/utils/logger';
+  import { DEFAULT_FILTERS, SALES_LIMITS } from '$lib/constants/sales';
+  import type { SalesFilters as ISalesFilters, SalesEvent, SalesMonitorStatus } from '$lib/types/sales';
   
   // State
-  let filters = {
-    timeframe: '24h',
-    cardSet: null,
-    rarity: null,
-    minPrice: null,
-    maxPrice: null
-  };
+  let filters: ISalesFilters = { ...DEFAULT_FILTERS };
   
-  let historicalSales: any[] = [];
+  let historicalSales: SalesEvent[] = [];
   let loading = false;
   let error: string | Error | null = null;
   let totalSales = 0;
   let currentPage = 1;
   let totalPages = 0;
-  let monitorStatus = { connected: false, subscribers: 0 };
+  let monitorStatus: SalesMonitorStatus = { connected: false, subscribers: 0 };
   let activeTab: 'live' | 'historical' | 'stats' = 'live';
   
   onMount(() => {
@@ -49,7 +45,7 @@
       const data = await salesService.loadHistoricalSales({
         filters,
         page: currentPage,
-        limit: 20
+        limit: SALES_LIMITS.DEFAULT_PAGE_SIZE
       });
       
       historicalSales = data.sales;
@@ -64,7 +60,7 @@
     }
   }
   
-  function handleFilterChange(event: CustomEvent) {
+  function handleFilterChange(event: CustomEvent<ISalesFilters>) {
     filters = event.detail;
     currentPage = 1;
     if (activeTab === 'historical') {
@@ -77,25 +73,8 @@
     loadHistoricalSales();
   }
   
-  function formatTimestamp(timestamp: string): string {
-    return new Date(timestamp).toLocaleString();
-  }
   
-  function getRarityColor(rarity?: string): string {
-    if (!rarity) return 'text-gray-500';
-    
-    switch (rarity.toLowerCase()) {
-      case 'common': return 'text-gray-600';
-      case 'uncommon': return 'text-green-600';
-      case 'rare': return 'text-blue-600';
-      case 'epic': return 'text-purple-600';
-      case 'legendary': return 'text-orange-600';
-      default: return 'text-gray-500';
-    }
-  }
-  
-  function handleNewSale(event: CustomEvent) {
-    logger.log('New sale detected:', event.detail);
+  function handleNewSale(event: CustomEvent<SalesEvent>) {
     if (activeTab === 'historical' && filters.timeframe !== 'all') {
       loadHistoricalSales();
     }
@@ -253,8 +232,8 @@
         {#if totalPages > 1}
           <div class="bg-gray-50 px-6 py-3 flex items-center justify-between">
             <div class="text-sm text-gray-700">
-              Showing <span class="font-medium">{(currentPage - 1) * 20 + 1}</span> to 
-              <span class="font-medium">{Math.min(currentPage * 20, totalSales)}</span> of 
+              Showing <span class="font-medium">{(currentPage - 1) * SALES_LIMITS.DEFAULT_PAGE_SIZE + 1}</span> to 
+              <span class="font-medium">{Math.min(currentPage * SALES_LIMITS.DEFAULT_PAGE_SIZE, totalSales)}</span> of 
               <span class="font-medium">{totalSales}</span> sales
             </div>
             <div class="flex space-x-2">

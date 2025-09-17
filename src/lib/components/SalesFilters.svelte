@@ -1,31 +1,18 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { TIMEFRAMES, RARITIES, DEFAULT_FILTERS } from '$lib/constants/sales';
+  import type { SalesFilters } from '$lib/types/sales';
 
-  const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher<{
+    filterChange: SalesFilters;
+  }>();
 
-  export let timeframe = '24h';
-  export let cardSet: string | null = null;
-  export let rarity: string | null = null;
-  export let minPrice: string | null = null;
-  export let maxPrice: string | null = null;
+  export let timeframe = DEFAULT_FILTERS.timeframe;
+  export let cardSet: string | null = DEFAULT_FILTERS.cardSet;
+  export let rarity: string | null = DEFAULT_FILTERS.rarity;
+  export let minPrice: string | null = DEFAULT_FILTERS.minPrice;
+  export let maxPrice: string | null = DEFAULT_FILTERS.maxPrice;
   export let loading = false;
-
-  const timeframes = [
-    { value: '1h', label: '1 Hour' },
-    { value: '24h', label: '24 Hours' },
-    { value: '7d', label: '7 Days' },
-    { value: '30d', label: '30 Days' },
-    { value: 'all', label: 'All Time' }
-  ];
-
-  const rarities = [
-    { value: '', label: 'All Rarities' },
-    { value: 'Common', label: 'Common' },
-    { value: 'Uncommon', label: 'Uncommon' },
-    { value: 'Rare', label: 'Rare' },
-    { value: 'Epic', label: 'Epic' },
-    { value: 'Legendary', label: 'Legendary' }
-  ];
 
   function handleFilterChange() {
     dispatch('filterChange', {
@@ -38,11 +25,11 @@
   }
 
   function clearFilters() {
-    timeframe = '24h';
-    cardSet = null;
-    rarity = null;
-    minPrice = null;
-    maxPrice = null;
+    timeframe = DEFAULT_FILTERS.timeframe;
+    cardSet = DEFAULT_FILTERS.cardSet;
+    rarity = DEFAULT_FILTERS.rarity;
+    minPrice = DEFAULT_FILTERS.minPrice;
+    maxPrice = DEFAULT_FILTERS.maxPrice;
     handleFilterChange();
   }
 
@@ -69,7 +56,7 @@
         class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
         disabled={loading}
       >
-        {#each timeframes as option}
+        {#each TIMEFRAMES as option}
           <option value={option.value}>{option.label}</option>
         {/each}
       </select>
@@ -101,7 +88,7 @@
         class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
         disabled={loading}
       >
-        {#each rarities as option}
+        {#each RARITIES as option}
           <option value={option.value}>{option.label}</option>
         {/each}
       </select>

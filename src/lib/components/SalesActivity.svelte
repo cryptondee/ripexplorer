@@ -1,46 +1,18 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { formatAddress } from '$lib/utils/format.js';
+  import { formatAddress, formatTimestamp, getRarityColor } from '$lib/utils/format.js';
   import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+  import { SALES_LIMITS, CONNECTION_SETTINGS } from '$lib/constants/sales';
+  import type { SalesEvent, ConnectionStatus } from '$lib/types/sales';
   import { createEventDispatcher } from 'svelte';
 
-  interface SalesEvent {
-    id: string;
-    transactionHash: string;
-    blockNumber: string;
-    buyer: {
-      address: string;
-      username?: string;
-    };
-    seller: {
-      address: string;
-      username?: string;
-    };
-    card: {
-      name?: string;
-      image?: string;
-      rarity?: string;
-      set?: string;
-      uniqueId?: string;
-      tokenId: string;
-    };
-    price: {
-      wei: string;
-      currency: string;
-      formatted?: string;
-    };
-    timestamp: string;
-  }
-
-  interface ConnectionStatus {
-    connected: boolean;
-    subscribers: number;
-  }
-
   export let showLiveEvents = true;
-  export let maxEvents = 50;
+  export let maxEvents = SALES_LIMITS.MAX_LIVE_EVENTS;
 
-  const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher<{
+    newSale: SalesEvent;
+    connected: void;
+  }>();
   
   let events: SalesEvent[] = [];
   let connectionStatus: ConnectionStatus = { connected: false, subscribers: 0 };
@@ -61,14 +33,14 @@
 
   async function loadInitialEvents() {
     try {
-      const response = await fetch('/api/sales?limit=10');
+      const response = await fetch(`/api/sales?limit=${SALES_LIMITS.INITIAL_EVENTS_LOAD}`);
       const data = await response.json();
       
       if (data.success) {
         events = data.sales;
       }
     } catch (err) {
-      console.error('Error loading initial events:', err);
+      // Silently fail for initial load
     }
   }
 
@@ -78,12 +50,9 @@
     isConnecting = true;
     error = null;
     
-    console.log('🔗 Connecting to live events...');
-    
     eventSource = new EventSource('/api/sales/live');
     
     eventSource.onopen = () => {
-      console.log('✅ Connected to live events');
       isConnecting = false;
       error = null;
       dispatch('connected');
@@ -94,36 +63,33 @@
         const data = JSON.parse(event.data);
         
         if (data.type === 'connected') {
-          console.log('📡 Live feed connected:', data.message);
+          // Connection established
         } else if (data.type === 'sale') {
-          console.log('🎉 New sale event received:', data.data);
           addNewEvent(data.data);
           dispatch('newSale', data.data);
         } else if (data.type === 'keepalive') {
           connectionStatus = data.status;
         }
       } catch (err) {
-        console.error('Error parsing SSE message:', err);
+        error = 'Error processing live data';
       }
     };
     
     eventSource.onerror = (err) => {
-      console.error('❌ SSE connection error:', err);
       isConnecting = false;
       error = 'Connection lost. Retrying...';
       
-      // Reconnect after 5 seconds
+      // Reconnect after delay
       setTimeout(() => {
         if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
           connectToLiveEvents();
         }
-      }, 5000);
+      }, CONNECTION_SETTINGS.RECONNECT_DELAY);
     };
   }
 
   function disconnectFromLiveEvents() {
     if (eventSource) {
-      console.log('🔌 Disconnecting from live events');
       eventSource.close();
       eventSource = null;
     }
@@ -134,23 +100,6 @@
     events = [newEvent, ...events.slice(0, maxEvents - 1)];
   }
 
-  function formatTimestamp(timestamp: string): string {
-    return new Date(timestamp).toLocaleTimeString();
-  }
-
-
-  function getRarityColor(rarity?: string): string {
-    if (!rarity) return 'text-gray-500';
-    
-    switch (rarity.toLowerCase()) {
-      case 'common': return 'text-gray-600';
-      case 'uncommon': return 'text-green-600';
-      case 'rare': return 'text-blue-600';
-      case 'epic': return 'text-purple-600';
-      case 'legendary': return 'text-orange-600';
-      default: return 'text-gray-500';
-    }
-  }
 </script>
 
 <div class="bg-white shadow rounded-lg">
@@ -251,7 +200,7 @@
                 {event.price.formatted || event.price.wei + ' wei'}
               </div>
               <div class="text-xs text-gray-500">
-                {formatTimestamp(event.timestamp)}
+                {formatTimestamp(event.timestamp, { timeOnly: true })}
               </div>
             </div>
           </div>

@@ -1,17 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { SALES_LIMITS, CURRENCY_DECIMALS } from '$lib/constants/sales';
+  import type { SalesStats, SalesFilters } from '$lib/types/sales';
 
-  interface SalesStats {
-    totalSales: number;
-    totalVolume: string;
-    averagePrice: string;
-    uniqueBuyers: number;
-    uniqueSellers: number;
-    topSet?: string;
-    topRarity?: string;
-  }
-
-  export let timeframe = '24h';
+  export let timeframe: SalesFilters['timeframe'] = '24h';
   
   let stats: SalesStats | null = null;
   let loading = true;
@@ -34,7 +26,7 @@
     try {
       // For now, calculate stats from the sales data
       // In a real implementation, you might have a dedicated stats endpoint
-      const response = await fetch(`/api/sales?timeframe=${timeframe}&limit=1000`);
+      const response = await fetch(`/api/sales?timeframe=${timeframe}&limit=${SALES_LIMITS.STATS_QUERY_LIMIT}`);
       const data = await response.json();
       
       if (data.success) {
@@ -63,15 +55,15 @@
               const priceWei = BigInt(sale.price.wei);
               totalVolumeWei += priceWei;
               
-              // Convert to USDC for average calculation (assuming USDC has 6 decimals)
-              const priceUSDC = Number(priceWei) / 1e6;
+              // Convert to USDC for average calculation
+              const priceUSDC = Number(priceWei) / Math.pow(10, CURRENCY_DECIMALS.USDC);
               prices.push(priceUSDC);
             } catch (err) {
-              console.error('Error parsing price:', sale.price.wei);
+              // Skip invalid price entries
             }
           }
           
-          const totalVolume = (Number(totalVolumeWei) / 1e6).toFixed(2);
+          const totalVolume = (Number(totalVolumeWei) / Math.pow(10, CURRENCY_DECIMALS.USDC)).toFixed(2);
           const averagePrice = prices.length > 0 
             ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2)
             : '0';
@@ -98,7 +90,6 @@
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Error loading stats:', err);
     } finally {
       loading = false;
     }

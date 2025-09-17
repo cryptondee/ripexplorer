@@ -76,3 +76,35 @@ export function formatCurrency(amount: number, currency: string = 'USD', locale:
     maximumFractionDigits: 2
   }).format(amount);
 }
+
+/**
+ * Format timestamp for display
+ * @param timestamp - ISO timestamp string
+ * @param options - Formatting options
+ * @returns Formatted timestamp
+ */
+export function formatTimestamp(timestamp: string, options: { timeOnly?: boolean } = {}): string {
+  const date = new Date(timestamp);
+  if (options.timeOnly) {
+    return date.toLocaleTimeString();
+  }
+  return date.toLocaleString();
+}
+
+/**
+ * Get CSS class for rarity color
+ * @param rarity - Card rarity string
+ * @returns Tailwind CSS class for rarity color
+ */
+export function getRarityColor(rarity?: string): string {
+  if (!rarity) return 'text-gray-500';
+  
+  switch (rarity.toLowerCase()) {
+    case 'common': return 'text-gray-600';
+    case 'uncommon': return 'text-green-600';
+    case 'rare': return 'text-blue-600';
+    case 'epic': return 'text-purple-600';
+    case 'legendary': return 'text-orange-600';
+    default: return 'text-gray-500';
+  }
+}

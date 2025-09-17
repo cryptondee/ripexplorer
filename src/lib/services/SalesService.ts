@@ -4,25 +4,7 @@
  */
 
 import { logger } from '$lib/utils/logger';
-
-export interface SalesFilters {
-  timeframe: string;
-  cardSet: string | null;
-  rarity: string | null;
-  minPrice: number | null;
-  maxPrice: number | null;
-}
-
-export interface SalesMonitorStatus {
-  connected: boolean;
-  subscribers: number;
-}
-
-export interface HistoricalSalesParams {
-  filters?: SalesFilters;
-  page?: number;
-  limit?: number;
-}
+import type { SalesFilters, SalesMonitorStatus, HistoricalSalesParams } from '$lib/types/sales';
 
 export class SalesService {
   /**
