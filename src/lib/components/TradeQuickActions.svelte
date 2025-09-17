@@ -1,23 +1,9 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
   import { EXTERNAL_URLS } from '$lib/constants/urls.js';
-  import { useClipboard } from '$lib/composables/useClipboard';
-
+  
   // Props
   export let userA: { username: string };
   export let userB: { username: string };
-  export let tradeAnalysis: {
-    summary: {
-      totalPerfectTrades: number;
-      totalOneWayToA: number;
-      totalOneWayToB: number;
-    };
-  };
-
-  // Event dispatcher
-  const dispatch = createEventDispatcher<{
-    copyGeneralSummary: void;
-  }>();
 
   function openProfileA() {
     window.open(EXTERNAL_URLS.RIP_FUN.PROFILE(userA.username), '_blank');
@@ -27,23 +13,6 @@
     window.open(EXTERNAL_URLS.RIP_FUN.PROFILE(userB.username), '_blank');
   }
 
-  const { copy } = useClipboard();
-  
-  async function copyGeneralSummary() {
-    const summary = `Trade Analysis: ${userA.username} vs ${userB.username}\n` +
-                   `Perfect Trades: ${tradeAnalysis.summary.totalPerfectTrades}\n` +
-                   `${userA.username} can receive: ${tradeAnalysis.summary.totalOneWayToA} cards\n` +
-                   `${userA.username} can give: ${tradeAnalysis.summary.totalOneWayToB} cards\n` +
-                   `Generated on: ${new Date().toLocaleDateString()}`;
-    
-    const success = await copy(summary, {
-      successMessage: 'Trade summary copied to clipboard!'
-    });
-    
-    if (success) {
-      dispatch('copyGeneralSummary');
-    }
-  }
 </script>
 
 <div class="bg-white rounded-lg shadow-md p-6">
@@ -62,13 +31,6 @@
       class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
     >
       🔗 View {userB.username} on rip.fun
-    </button>
-    <button 
-      type="button"
-      on:click={copyGeneralSummary}
-      class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-    >
-      📋 Copy Trade Summary
     </button>
   </div>
 </div>

@@ -315,8 +315,6 @@
       <TradeQuickActions
         userA={tradeResults.userA}
         userB={tradeResults.userB}
-        tradeAnalysis={tradeResults.tradeAnalysis}
-        on:copyGeneralSummary={copyTradeSummary}
       />
       
       <!-- Filters -->
