@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { WebSocketServer } from 'ws';
+import WebSocket from 'ws';
 import { createPublicClient, http, parseAbiItem, decodeEventLog, type Log } from 'viem';
 import { base } from 'viem/chains';
 import { prisma } from '$lib/server/db/client.js';

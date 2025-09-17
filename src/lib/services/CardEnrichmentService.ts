@@ -101,6 +101,37 @@ export class CardEnrichmentService {
       // PRIORITY 2: Try to fetch from rip.fun API using uniqueId
       if (partialCard.uniqueId) {
         logger.log(`Fetching card data using uniqueId: ${partialCard.uniqueId}`);
+        
+        // Try the onchain metadata endpoint first (more reliable)
+        const onchainResponse = await fetch(`https://rip.fun/api/onchain/card/${partialCard.uniqueId}/metadata`);
+        if (onchainResponse.ok) {
+          const onchainData = await onchainResponse.json();
+          logger.log(`Successfully fetched onchain data for ${partialCard.uniqueId}`);
+          
+          // Extract card_id from onchain metadata
+          const attributesMap = new Map();
+          if (onchainData.attributes && Array.isArray(onchainData.attributes)) {
+            onchainData.attributes.forEach((attr: any) => {
+              if (attr.trait_type && attr.value !== undefined) {
+                attributesMap.set(attr.trait_type, attr.value);
+              }
+            });
+          }
+          
+          const cardId = attributesMap.get('Card Id');
+          if (cardId) {
+            logger.log(`Extracted card_id from onchain data: ${cardId}`);
+            // Now fetch the full card data using the card_id
+            const cardResponse = await fetch(`https://api.rip.fun/cards/${cardId}`);
+            if (cardResponse.ok) {
+              const cardData = await cardResponse.json();
+              logger.log(`Successfully fetched full card data for ${cardId}`);
+              return this.transformApiResponse(cardData, partialCard);
+            }
+          }
+        }
+        
+        // Fallback: try direct API call with uniqueId
         const response = await fetch(`https://api.rip.fun/cards/${partialCard.uniqueId}`);
         if (response.ok) {
           const cardData = await response.json();
