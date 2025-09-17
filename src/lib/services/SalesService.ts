@@ -48,25 +48,27 @@ export class SalesService {
     } = params;
     
     try {
-      const response = await fetch('/api/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'query',
-          filters,
-          page,
-          limit
-        })
-      });
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.set('page', page.toString());
+      queryParams.set('limit', limit.toString());
+      queryParams.set('timeframe', filters.timeframe || '24h');
       
+      // Add optional filters
+      if (filters.cardSet) queryParams.set('set', filters.cardSet);
+      if (filters.rarity) queryParams.set('rarity', filters.rarity);
+      if (filters.minPrice) queryParams.set('minPrice', filters.minPrice);
+      if (filters.maxPrice) queryParams.set('maxPrice', filters.maxPrice);
+      
+      const response = await fetch(`/api/sales?${queryParams.toString()}`);
       const data = await response.json();
       
       if (data.success) {
         return {
           sales: data.sales || [],
-          totalSales: data.total || 0,
-          currentPage: data.page || page,
-          totalPages: data.totalPages || 0
+          totalSales: data.pagination?.total || 0,
+          currentPage: data.pagination?.page || page,
+          totalPages: data.pagination?.totalPages || 0
         };
       }
       

@@ -52,7 +52,7 @@ export const GET: RequestHandler = async ({ request }) => {
           controller.enqueue(new TextEncoder().encode(data));
           return true;
         } catch (error) {
-          console.log('❌ SSE Controller error:', error);
+          // Controller is closed, mark as closed and cleanup
           if (!isClosed) cleanup();
           return false;
         }
@@ -76,7 +76,6 @@ export const GET: RequestHandler = async ({ request }) => {
           data: saleEvent
         };
         
-        console.log(`📡 Broadcasting sale event: ${saleEvent.transactionHash}`);
         safeEnqueue(`data: ${JSON.stringify(eventData)}\n\n`);
       });
 
