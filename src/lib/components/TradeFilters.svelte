@@ -9,6 +9,12 @@
   export let selectedTradeType: string = 'all';
   export let showDuplicatesOnly: boolean = false;
   export let enableCrossSetTrading: boolean = false;  // New: Toggle for cross-set trading
+  
+  // Card selection props
+  export let enableCardSelection: boolean = false;
+  export let selectedGiveCards: Set<string> = new Set();
+  export let selectedReceiveCards: Set<string> = new Set();
+  export let filteredTrades: any[] = [];
 
   // Data props
   export let sortedAvailableSets: any[] = [];
@@ -29,6 +35,8 @@
     duplicatesToggle: boolean;
     crossSetToggle: boolean;  // New event for cross-set toggle
     clearFilters: void;
+    cardSelectionToggle: boolean;
+    copyTradeSummary: void;
   }>();
 
   function handleSetChange() {
@@ -74,8 +82,21 @@
     selectedTradeType = 'all';
     showDuplicatesOnly = false;
     enableCrossSetTrading = false;
+    enableCardSelection = false;
     dispatch('clearFilters');
   }
+  
+  function handleCardSelectionToggle() {
+    dispatch('cardSelectionToggle', !enableCardSelection);
+  }
+  
+  function handleCopyTradeSummary() {
+    dispatch('copyTradeSummary');
+  }
+  
+  // Computed values for summary display
+  $: selectedGiveCount = enableCardSelection ? selectedGiveCards.size : filteredTrades.filter(t => t.tradeType === 'give').length;
+  $: selectedReceiveCount = enableCardSelection ? selectedReceiveCards.size : filteredTrades.filter(t => t.tradeType === 'receive').length;
 </script>
 
 <div class="bg-white rounded-lg shadow-md p-8 mb-8">
@@ -197,5 +218,53 @@
     >
       Clear Filters
     </button>
+  </div>
+  
+  <!-- Card Selection and Trade Actions -->
+  <div class="mt-6 pt-6 border-t border-gray-200">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-900">🎯 Customize Trade Analysis</h3>
+        <p class="text-sm text-gray-600 mt-1">Select specific cards to include in trade calculations</p>
+      </div>
+      <button
+        type="button"
+        on:click={handleCardSelectionToggle}
+        class="px-4 py-2 rounded-lg font-medium transition-colors {enableCardSelection 
+          ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}"
+      >
+        {enableCardSelection ? '✓ Selection Enabled' : '📝 Enable Selection'}
+      </button>
+    </div>
+    
+    {#if enableCardSelection}
+      <div class="mb-4 p-3 bg-indigo-50 rounded-lg">
+        <p class="text-sm text-indigo-800">
+          <span class="font-medium">Selection Mode Active:</span> 
+          Use checkboxes to select which cards to include in trades. 
+          Deselected cards (grayed out) won't be included in trade calculations.
+        </p>
+      </div>
+    {/if}
+    
+    <!-- Trade Summary Actions -->
+    <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+      <div class="text-sm text-gray-600">
+        <span class="font-medium">Trade Summary:</span>
+        {selectedGiveCount} cards to give • {selectedReceiveCount} cards to receive
+        {#if enableCardSelection}
+          <span class="text-indigo-600">(selected cards only)</span>
+        {/if}
+      </div>
+      <button
+        type="button"
+        on:click={handleCopyTradeSummary}
+        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        disabled={selectedGiveCount === 0 && selectedReceiveCount === 0}
+      >
+        📋 Copy Trade Summary
+      </button>
+    </div>
   </div>
 </div>

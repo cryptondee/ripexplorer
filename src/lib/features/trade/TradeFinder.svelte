@@ -342,6 +342,10 @@
         bind:selectedTradeType={filters.selectedTradeType}
         bind:showDuplicatesOnly={filters.showDuplicatesOnly}
         bind:enableCrossSetTrading={filters.enableCrossSetTrading}
+        bind:enableCardSelection={enableCardSelection}
+        bind:selectedGiveCards={selectedGiveCards}
+        bind:selectedReceiveCards={selectedReceiveCards}
+        bind:filteredTrades={filteredTrades}
         userA={tradeResults.userA}
         userB={tradeResults.userB}
         getSetCompletion={(setId, user) => {
@@ -368,36 +372,11 @@
           filters.enableCrossSetTrading = e.detail;
           loadFilteredTrades();
         }}
+        on:cardSelectionToggle={(e) => {
+          toggleCardSelection();
+        }}
+        on:copyTradeSummary={copyTradeSummary}
       />
-      
-      <!-- Card Selection Toggle -->
-      <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900">🎯 Customize Trade Analysis</h3>
-            <p class="text-sm text-gray-600 mt-1">Select specific cards to include in trade calculations</p>
-          </div>
-          <button
-            type="button"
-            on:click={toggleCardSelection}
-            class="px-4 py-2 rounded-lg font-medium transition-colors {enableCardSelection 
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}"
-          >
-            {enableCardSelection ? '✓ Selection Enabled' : '📝 Enable Selection'}
-          </button>
-        </div>
-        
-        {#if enableCardSelection}
-          <div class="mt-4 p-3 bg-indigo-50 rounded-lg">
-            <p class="text-sm text-indigo-800">
-              <span class="font-medium">Selection Mode Active:</span> 
-              Use checkboxes to select which cards to include in trades. 
-              Deselected cards (grayed out) won't be included in trade calculations.
-            </p>
-          </div>
-        {/if}
-      </div>
       
       <!-- Trade Tables -->
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
