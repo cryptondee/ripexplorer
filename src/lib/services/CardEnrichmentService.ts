@@ -186,17 +186,27 @@ export class CardEnrichmentService {
 
   /**
    * Create fallback enriched data when API is unavailable
+   * Enhanced to provide better data from existing sales info
    */
   private createFallbackEnrichedData(partialCard: any): EnrichedCardData {
-    const cardId = partialCard.uniqueId || `token-${partialCard.tokenId}`;
+    // Use available data to create a reasonable card ID
+    let cardId = partialCard.uniqueId || `token-${partialCard.tokenId}`;
+    
+    // If we have name and set, create a more meaningful ID
+    if (partialCard.name && partialCard.set) {
+      const cleanName = partialCard.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const cleanSet = partialCard.set.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      cardId = `${cleanSet}-${cleanName}`;
+    }
+    
     const cardName = partialCard.name || `Token #${partialCard.tokenId}`;
     
     return {
       id: cardId,
       name: cardName,
-      card_number: '',
+      card_number: '', // Not available in older metadata
       rarity: partialCard.rarity || 'Unknown',
-      set_id: '',
+      set_id: '', // Not available in older metadata
       set_name: partialCard.set || 'Unknown Set',
       large_image_url: this.buildImageUrl(partialCard.image, 'large'),
       small_image_url: this.buildImageUrl(partialCard.image, 'small'),
@@ -210,6 +220,7 @@ export class CardEnrichmentService {
 
   /**
    * Build full image URL from relative path
+   * Enhanced to handle different image path formats
    */
   private buildImageUrl(relativePath?: string, size: 'large' | 'small' = 'large'): string {
     if (!relativePath) return '';
@@ -221,7 +232,14 @@ export class CardEnrichmentService {
     
     // Build full URL for rip.fun images
     const baseUrl = 'https://d2hl7maqck52px.cloudfront.net';
-    return `${baseUrl}/${relativePath}`;
+    
+    // Handle different path formats
+    let imagePath = relativePath;
+    if (!imagePath.startsWith('/')) {
+      imagePath = `/${imagePath}`;
+    }
+    
+    return `${baseUrl}${imagePath}`;
   }
 
   /**
