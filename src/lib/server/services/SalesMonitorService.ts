@@ -102,7 +102,14 @@ export class SalesMonitorService extends EventEmitter {
    * Initialize WebSocket server for client connections
    */
   private initializeWebSocketServer(): void {
-    this.wsServer = new WebSocketServer({ port: 8080 });
+    // Use port 0 to let the system assign an available port
+    this.wsServer = new WebSocketServer({ port: 0 });
+    
+    this.wsServer.on('listening', () => {
+      const address = this.wsServer?.address();
+      const port = typeof address === 'object' && address ? address.port : 'unknown';
+      logger.log(`📡 WebSocket server listening on port ${port}`);
+    });
     
     this.wsServer.on('connection', (ws) => {
       logger.log('👥 New client connected to sales stream');
