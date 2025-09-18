@@ -290,10 +290,10 @@
           type="button"
           on:click={handleClaimProfile}
           disabled={!canSubmit}
-          class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+          class="btn-primary"
         >
           {#if loading}
-            <div class="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+            <div class="spinner"></div>
             Securing Your Account...
           {:else}
             🔒 Secure My Watchlist
@@ -319,3 +319,7 @@
     </div>
   </div>
 {/if}
+
+<style>
+  @import '../styles/buttons.css';
+</style>

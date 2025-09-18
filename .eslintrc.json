@@ -1,0 +1,71 @@
+{
+  "root": true,
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:svelte/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "parserOptions": {
+    "sourceType": "module",
+    "ecmaVersion": 2020,
+    "extraFileExtensions": [".svelte"]
+  },
+  "env": {
+    "browser": true,
+    "es2017": true,
+    "node": true
+  },
+  "overrides": [
+    {
+      "files": ["*.svelte"],
+      "parser": "svelte-eslint-parser",
+      "parserOptions": {
+        "parser": "@typescript-eslint/parser"
+      }
+    }
+  ],
+  "rules": {
+    "no-console": ["error", {
+      "allow": ["warn", "error"]
+    }],
+    "no-magic-numbers": ["warn", { 
+      "ignore": [0, 1, -1, 2, 100, 1000],
+      "ignoreArrayIndexes": true,
+      "enforceConst": true
+    }],
+    "max-lines": ["warn", {
+      "max": 300,
+      "skipBlankLines": true,
+      "skipComments": true
+    }],
+    "max-lines-per-function": ["warn", {
+      "max": 100,
+      "skipBlankLines": true,
+      "skipComments": true
+    }],
+    "complexity": ["warn", 15],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_"
+    }],
+    "svelte/no-unused-svelte-ignore": "error",
+    "svelte/no-dupe-else-if-blocks": "error",
+    "svelte/no-at-html-tags": "warn",
+    "svelte/valid-compile": ["error", {
+      "ignoreWarnings": false
+    }]
+  },
+  "ignorePatterns": [
+    "node_modules",
+    "build",
+    ".svelte-kit",
+    "dist",
+    "scripts/dev/*",
+    "scripts/test/*",
+    "scripts/migrations/*"
+  ]
+}
