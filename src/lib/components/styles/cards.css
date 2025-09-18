@@ -1,0 +1,111 @@
+/* Card styles module - Card displays and layouts */
+
+/* Card containers */
+.card-grid {
+  @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4;
+}
+
+.card-list {
+  @apply space-y-4;
+}
+
+/* Individual cards */
+.card {
+  @apply bg-white rounded-lg shadow-md overflow-hidden;
+  @apply hover:shadow-lg transition-shadow;
+}
+
+.card-clickable {
+  @apply bg-white rounded-lg shadow-md overflow-hidden cursor-pointer;
+  @apply hover:shadow-lg hover:scale-105 transition-all;
+}
+
+.card-selected {
+  @apply ring-2 ring-blue-500 ring-offset-2;
+}
+
+/* Card image */
+.card-image {
+  @apply w-full h-auto object-cover;
+}
+
+.card-image-container {
+  @apply relative aspect-[2/3] bg-gray-100;
+}
+
+.card-image-loading {
+  @apply animate-pulse bg-gray-200;
+}
+
+/* Card content */
+.card-body {
+  @apply p-3;
+}
+
+.card-title {
+  @apply text-sm font-semibold text-gray-900 truncate;
+}
+
+.card-subtitle {
+  @apply text-xs text-gray-500 truncate;
+}
+
+.card-stats {
+  @apply flex justify-between items-center mt-2;
+}
+
+/* Card badges */
+.card-badge {
+  @apply absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.card-quantity {
+  @apply absolute bottom-2 right-2 bg-blue-600 text-white px-2 py-1 rounded-full text-xs font-bold;
+}
+
+/* Card thumbnails (for galleries) */
+.card-thumbnail {
+  @apply flex-shrink-0 w-16 h-20 border-2 rounded overflow-hidden;
+  @apply hover:border-blue-400 transition-colors cursor-pointer;
+}
+
+.card-thumbnail-selected {
+  @apply border-blue-500;
+}
+
+.card-thumbnail-unselected {
+  @apply border-gray-300;
+}
+
+/* Card details modal */
+.card-detail-image {
+  @apply max-w-full h-auto rounded-lg shadow-md;
+  @apply hover:shadow-lg transition-shadow cursor-pointer;
+}
+
+.card-detail-section {
+  @apply bg-gray-50 rounded-lg p-4;
+}
+
+.card-detail-row {
+  @apply flex justify-between py-2 border-b border-gray-200 last:border-b-0;
+}
+
+.card-detail-label {
+  @apply text-sm font-medium text-gray-500;
+}
+
+.card-detail-value {
+  @apply text-sm text-gray-900;
+}
+
+/* Card overlays */
+.card-overlay {
+  @apply absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20;
+  @apply transition-all flex items-center justify-center;
+}
+
+.card-overlay-content {
+  @apply opacity-0 hover:opacity-100 transition-opacity;
+  @apply bg-white bg-opacity-90 px-3 py-1 rounded-full text-sm text-gray-800;
+}

@@ -1,0 +1,65 @@
+/* Table styles module - Centralized table classes */
+
+/* Table containers */
+.table-container {
+  @apply overflow-x-auto shadow-sm border border-gray-200 rounded-lg;
+}
+
+/* Table base */
+.table {
+  @apply min-w-full divide-y divide-gray-200;
+}
+
+/* Table headers */
+.table-header {
+  @apply bg-gray-50;
+}
+
+.table-header-cell {
+  @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+}
+
+.table-header-sortable {
+  @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  @apply cursor-pointer hover:bg-gray-100 select-none;
+}
+
+/* Table body */
+.table-body {
+  @apply bg-white divide-y divide-gray-200;
+}
+
+.table-row {
+  @apply hover:bg-gray-50 transition-colors;
+}
+
+.table-row-clickable {
+  @apply hover:bg-gray-50 cursor-pointer transition-colors;
+}
+
+.table-row-selected {
+  @apply bg-blue-50 hover:bg-blue-100;
+}
+
+/* Table cells */
+.table-cell {
+  @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+}
+
+.table-cell-secondary {
+  @apply px-6 py-4 whitespace-nowrap text-sm text-gray-500;
+}
+
+.table-cell-center {
+  @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center;
+}
+
+/* Empty state */
+.table-empty {
+  @apply px-6 py-12 text-center text-gray-500;
+}
+
+/* Loading state */
+.table-loading {
+  @apply animate-pulse bg-gray-100;
+}
