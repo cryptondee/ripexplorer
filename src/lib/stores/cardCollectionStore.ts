@@ -2,6 +2,7 @@
 import { writable, derived } from 'svelte/store';
 import { getSetNameFromCard } from '$lib/utils/card';
 import { getMarketValue, getListedPrice } from '$lib/utils/pricing';
+import { logger } from '$lib/utils/logger';
 
 // ==========================================
 // 1. RAW DATA STORES
@@ -127,7 +128,7 @@ export async function performExtraction(username?: string, forceRefreshFlag = fa
       await fetchAllUserSets(result.extractedData);
       loadingMessage.set('All data loaded successfully!');
     } catch (err) {
-      console.warn('Some set data failed to load:', err);
+      logger.warn('CardCollection: Some set data failed to load', { error: err });
       loadingMessage.set('Extraction completed (some set data may be incomplete)');
     }
   } catch (err) {
@@ -190,11 +191,11 @@ async function fetchCompleteSetData(setId: string) {
 
     // Cache the data in memory only (Redis handles persistent caching)
     setCardsData.update(cache => ({ ...cache, [setId]: data }));
-    console.log(`Set data fetched: ${setId} (cached: ${data.cached ? 'yes' : 'no'})`);
+    logger.debug('CardCollection: Set data fetched', { setId, cached: data.cached });
     
     return data;
   } catch (err) {
-    console.error(`Error fetching set ${setId} data:`, err);
+    logger.error('CardCollection: Error fetching set data', { setId, error: err });
     setDataErrors.update(errors => ({
       ...errors,
       [setId]: err instanceof Error ? err.message : 'Failed to fetch set data'
@@ -223,7 +224,7 @@ async function fetchAllUserSets(data: any) {
     }
   });
 
-  console.log('Fetching complete set data for sets:', Array.from(userSetIds));
+  logger.debug('CardCollection: Fetching complete set data', { setIds: Array.from(userSetIds) });
 
   // Fetch complete set data for each unique set
   const fetchPromises = Array.from(userSetIds).map(async (setId) => {
@@ -231,13 +232,13 @@ async function fetchAllUserSets(data: any) {
       await fetchCompleteSetData(setId);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      console.error(`Failed to fetch complete set data for ${setId}:`, err);
+      logger.error('CardCollection: Failed to fetch complete set data', { setId, error: err });
       bulkFetchErrors.update(errors => [...errors, `Set ${setId}: ${errorMsg}`]);
     }
   });
 
   await Promise.all(fetchPromises);
-  console.log('All set data fetching completed');
+  logger.debug('CardCollection: All set data fetching completed');
   fetchingAllSets.set(false);
 }
 
@@ -286,7 +287,7 @@ async function getMissingCards(setId: string, userCards: any[]) {
             }
           }
         } catch (err) {
-          console.error(`Error fetching listings for card ${card.id}:`, err);
+          logger.error('CardCollection: Error fetching listings for card', { cardId: card.id, error: err });
         }
         
         return {
@@ -302,7 +303,7 @@ async function getMissingCards(setId: string, userCards: any[]) {
     
     return missingCardsWithListings;
   } catch (err) {
-    console.error(`Error getting missing cards for set ${setId}:`, err);
+    logger.error('CardCollection: Error getting missing cards', { setId, error: err });
     return [];
   }
 }
@@ -322,7 +323,7 @@ export async function searchUsers(query: string) {
       showSearchResults.set(false);
     }
   } catch (err) {
-    console.warn('User search failed:', err);
+    logger.warn('CardCollection: User search failed', { error: err });
     searchResults.set([]);
     showSearchResults.set(false);
   } finally {
@@ -343,14 +344,14 @@ export async function triggerSync() {
     
     if (response.ok) {
       const data = await response.json();
-      console.log('Sync started:', data);
+      logger.debug('CardCollection: Sync started', { data });
       await checkSyncStatus();
     } else {
       const errorData = await response.json();
-      console.error('Sync failed:', errorData);
+      logger.error('CardCollection: Sync failed', { error: errorData });
     }
   } catch (err) {
-    console.error('Sync request failed:', err);
+    logger.error('CardCollection: Sync request failed', { error: err });
   } finally {
     syncLoading.set(false);
   }
@@ -364,7 +365,7 @@ export async function checkSyncStatus() {
       syncStatus.set(data);
     }
   } catch (err) {
-    console.warn('Failed to check sync status:', err);
+    logger.warn('CardCollection: Failed to check sync status', { error: err });
   }
 }
 
@@ -372,7 +373,7 @@ export async function checkSyncStatus() {
 export function clearAllSetCaches(): void {
   // Clear in-memory set cache (Redis handles persistent caching)
   setCardsData.set({});
-  console.log('Cleared in-memory set cache');
+  logger.debug('CardCollection: Cleared in-memory set cache');
 }
 
 // Export functionality
@@ -397,7 +398,7 @@ export function copyToClipboard(data: any) {
   
   navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
     // Could add a toast notification here
-    console.log('Copied to clipboard');
+    logger.debug('CardCollection: Data copied to clipboard');
   });
 }
 
@@ -487,7 +488,11 @@ export const combinedCards = derived(
 
     // Handle missing cards based on toggles
     if ($selectedSet !== 'all' && ($showMissingCards || $onlyMissingCards)) {
-      console.log('Missing cards logic triggered:', { showMissingCards: $showMissingCards, onlyMissingCards: $onlyMissingCards, selectedSet: $selectedSet });
+      logger.debug('CardCollection: Missing cards logic triggered', { 
+        showMissingCards: $showMissingCards, 
+        onlyMissingCards: $onlyMissingCards, 
+        selectedSet: $selectedSet 
+      });
       try {
         // Find the set ID for the selected set
         const userCardsForSet = $cardsBySet[$selectedSet]?.cards || [];
@@ -497,25 +502,29 @@ export const combinedCards = derived(
         
         if (setId) {
           const missingCards = await getMissingCards(setId, userCardsForSet);
-          console.log('Got missing cards:', missingCards.length);
+          logger.debug('CardCollection: Got missing cards', { count: missingCards.length });
           
           if ($onlyMissingCards) {
             // Show only missing cards
-            console.log('Showing only missing cards');
+            logger.debug('CardCollection: Showing only missing cards');
             return missingCards;
           } else if ($showMissingCards && !$onlyMissingCards) {
             // Show both owned and missing cards
-            console.log('Showing owned + missing cards');
+            logger.debug('CardCollection: Showing owned + missing cards');
             return [...ownedCards, ...missingCards];
           }
         }
       } catch (err) {
-        console.error('Error loading missing cards:', err);
+        logger.error('CardCollection: Error loading missing cards', { error: err });
         return ownedCards;
       }
     }
     
-    console.log('Not showing missing cards:', { selectedSet: $selectedSet, showMissingCards: $showMissingCards, onlyMissingCards: $onlyMissingCards });
+    logger.debug('CardCollection: Not showing missing cards', { 
+      selectedSet: $selectedSet, 
+      showMissingCards: $showMissingCards, 
+      onlyMissingCards: $onlyMissingCards 
+    });
     return ownedCards;
   }
 );
