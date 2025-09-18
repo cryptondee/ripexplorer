@@ -43,10 +43,16 @@ export const GET: RequestHandler = async () => {
 
   // Test DNS resolution
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
     const dnsTest = await fetch('https://www.rip.fun', { 
       method: 'HEAD',
-      signal: AbortSignal.timeout(3000)
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
+    
     results.ripFunDns = {
       status: 'resolved',
       httpStatus: dnsTest.status

@@ -14,7 +14,6 @@ export async function extractFromRipFunAPI(userId: string): Promise<any> {
     logger.api('GET', cardsUrl);
     
     const cardsResponse = await fetch(cardsUrl, {
-      signal: AbortSignal.timeout(10000), // 10 second timeout
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json'
