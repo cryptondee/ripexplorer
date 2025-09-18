@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { authStore, isAuthenticated } from '$lib/stores/authStore';
-  import { requireAuthentication } from '$lib/utils/authGuards';
-  import ProfileClaimModal from './ProfileClaimModal.svelte';
+  import { authStore } from '$lib/stores/authStore.js';
+  import ClaimProfileModal from './ClaimProfileModal.svelte';
+  import { logger } from '$lib/utils/logger';
   
   // Props
   export let requireAuth: boolean = true;
@@ -44,7 +43,7 @@
     const { username, sessionToken } = event.detail;
     showAuthModal = false;
     authorized = true;
-    console.log(`Profile claimed successfully for ${username}`);
+    logger.log('AuthGuard: Profile claimed successfully', { username });
   }
   
   // Handle continue as guest
@@ -54,7 +53,7 @@
       authorized = true;
     }
     authStore.continueAsGuest();
-    console.log('User chose to continue as guest');
+    logger.log('AuthGuard: User chose to continue as guest');
   }
   
   // Handle modal close

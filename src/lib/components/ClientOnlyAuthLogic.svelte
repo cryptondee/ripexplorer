@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
+  import { logger } from '$lib/utils/logger';
   
   // Props - these come from parent component
   export let extractedData: any = null;
@@ -67,7 +68,7 @@
   function handleProfileClaimed(event: CustomEvent) {
     const { username, sessionToken } = event.detail;
     showClaimModal = false;
-    console.log(`Profile claimed successfully for ${username}`);
+    logger.log('ClientOnlyAuthLogic: Profile claimed successfully', { username });
   }
   
   function handleContinueAsGuest() {
@@ -75,7 +76,7 @@
     if (authStore) {
       authStore.continueAsGuest();
     }
-    console.log('User chose to continue as guest');
+    logger.log('ClientOnlyAuthLogic: User chose to continue as guest');
   }
   
   function handleClaimModalClose() {

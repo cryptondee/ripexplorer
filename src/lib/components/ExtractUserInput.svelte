@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { logger } from '$lib/utils/logger';
   
   // Props - Enhanced interface for reusability
   let {
@@ -96,7 +97,7 @@
   // Internal sync functionality (moved from page)
   async function triggerSync() {
     try {
-      console.log('Starting sync, syncLoading set to true');
+      logger.debug('ExtractUserInput: Starting sync', { syncLoading: true });
       syncLoading = true;
       
       const response = await fetch('/api/sync-users', {
@@ -108,23 +109,25 @@
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Sync started:', data);
+        logger.log('ExtractUserInput: Sync started', { data });
         await checkSyncStatus();
         dispatch('syncComplete', data);
       } else if (response.status === 429) {
         const errorData = await response.json();
-        console.log('Sync rate limited:', errorData);
+        logger.warn('ExtractUserInput: Sync rate limited', { errorData });
         await checkSyncStatus(); // Refresh status to get rate limit info
       } else {
         const errorData = await response.json();
-        console.error('Sync failed:', errorData);
+        logger.error('ExtractUserInput: Sync failed', { errorData });
         await checkSyncStatus(); // Refresh status even on error
       }
     } catch (err) {
-      console.error('Sync request failed:', err);
+      logger.error('ExtractUserInput: Sync request failed', { 
+        error: err instanceof Error ? err.message : String(err) 
+      });
       await checkSyncStatus(); // Refresh status on error
     } finally {
-      console.log('Sync complete, syncLoading set to false');
+      logger.debug('ExtractUserInput: Sync complete', { syncLoading: false });
       syncLoading = false;
     }
   }

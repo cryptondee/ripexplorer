@@ -1,4 +1,9 @@
 <script lang="ts">
+  import { authStore } from '$lib/stores/authStore.js';
+  import { modalStore } from '$lib/stores/modalStore.js';
+  import ClaimProfileModal from './ClaimProfileModal.svelte';
+  import LoginModal from './LoginModal.svelte';
+  import { logger } from '$lib/utils/logger';
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
   
@@ -10,7 +15,6 @@
   // State
   let mounted = false;
   let ProfileClaimModal: any = null;
-  let authStore: any = null;
   let isAuthenticated: any = null;
   
   // Event handlers
@@ -36,7 +40,9 @@
         
         mounted = true;
       } catch (error) {
-        console.error('Failed to load authentication components:', error);
+        logger.error('ClientOnlyAuth: Failed to load authentication components', { 
+          error: error instanceof Error ? error.message : String(error) 
+        });
       }
     }
   });
@@ -45,7 +51,7 @@
   function defaultHandleProfileClaimed(event: CustomEvent) {
     const { username, sessionToken } = event.detail;
     showClaimModal = false;
-    console.log(`Profile claimed successfully for ${username}`);
+    logger.log('ClientOnlyAuth: Profile claimed successfully', { username });
     if (handleProfileClaimed) handleProfileClaimed(event);
   }
   
@@ -54,7 +60,7 @@
     if (authStore) {
       authStore.continueAsGuest();
     }
-    console.log('User chose to continue as guest');
+    logger.log('ClientOnlyAuth: User chose to continue as guest');
     if (handleContinueAsGuest) handleContinueAsGuest();
   }
   
