@@ -72,24 +72,25 @@ export function adaptExtractCard(card: any): UniformCardData {
  * Adapt trade finder card data (flattened structure)
  */
 export function adaptTradeCard(trade: any): UniformCardData {
+  const card = trade.card || trade;
   return {
-    id: trade.card?.id || `token-${trade.card?.tokenId}`,
-    name: trade.card?.name || `Token #${trade.card?.tokenId}`,
-    tokenId: trade.card?.tokenId || '',
-    uniqueId: trade.card?.uniqueId,
-    card_number: trade.card?.card_number || '',
-    rarity: trade.card?.rarity || 'Unknown',
-    set_id: trade.card?.set_id || '',
-    set_name: trade.card?.set || 'Unknown Set',
-    large_image_url: trade.card?.large_image_url,
-    small_image_url: trade.card?.small_image_url,
-    image: trade.card?.image || trade.card?.large_image_url,
+    id: card?.id || card?.card_id || `card-${card?.name?.replace(/\s+/g, '-').toLowerCase()}`,
+    name: card?.name || 'Unknown Card',
+    tokenId: card?.tokenId || card?.token_id || '',
+    uniqueId: card?.uniqueId || card?.unique_id,
+    card_number: card?.card_number || card?.number || '',
+    rarity: card?.rarity || 'Unknown',
+    set_id: card?.set_id || '',
+    set_name: card?.set || card?.set_name || 'Unknown Set',
+    large_image_url: card?.large_image_url || card?.image_url,
+    small_image_url: card?.small_image_url || card?.image_url,
+    image: card?.large_image_url || card?.small_image_url || card?.image_url,
     source: 'trade',
     context: {
       tradeType: trade.tradeType,
       userAHas: trade.userAHas,
       userBHas: trade.userBHas,
-      estimatedValue: trade.card?.estimatedValue
+      estimatedValue: card?.estimatedValue || card?.market_value
     }
   };
 }
@@ -126,13 +127,13 @@ export function adaptCard(cardData: any, source?: 'extract' | 'trade' | 'sales')
   if (!source) {
     if (cardData.card?.card && cardData.unique_id) {
       source = 'extract';
-    } else if (cardData.tradeType) {
+    } else if (cardData.tradeType || (cardData.card && (cardData.userAHas !== undefined || cardData.userBHas !== undefined))) {
       source = 'trade';
     } else if (cardData.price || cardData.timestamp) {
       source = 'sales';
     } else {
-      // Default fallback
-      source = 'extract';
+      // Default fallback - try trade first since it's more flexible
+      source = 'trade';
     }
   }
 
