@@ -235,10 +235,6 @@
 </div>
 
 <style>
-  .card-display {
-    /* Component-specific styles if needed */
-  }
-  
   .hidden {
     display: none;
   }

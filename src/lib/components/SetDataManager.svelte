@@ -3,6 +3,7 @@
   import { getSetNameFromCard } from '$lib/utils/card';
   import { browser } from '$app/environment';
   import { deduplicatedFetch } from '$lib/utils/setDataDeduplication';
+  import { logger } from '$lib/utils/logger';
 
   // Props using Svelte 5 runes syntax
   let {
@@ -41,7 +42,7 @@
   
   // Component instance identifier for debugging
   const componentId = Math.random().toString(36).substring(2, 8);
-  console.log(`🏗️ SetDataManager: Component instance ${componentId} created`);
+  logger.debug('SetDataManager: Component created', { componentId });
 
   // Event dispatcher
   const dispatch = createEventDispatcher<{
@@ -54,19 +55,19 @@
   async function fetchCompleteSetData(setId: string) {
     // Only run on client-side to prevent SSR duplicate requests
     if (!browser) {
-      console.log(`🚫 SetDataManager[${componentId}]: Skipping fetch for ${setId} (SSR)`);
+      logger.debug('SetDataManager: Skipping SSR fetch', { componentId, setId });
       return null;
     }
 
     // Check if data is already cached
     if (setCardsData[setId]) {
-      console.log(`🎯 SetDataManager[${componentId}]: Using cached data for set ${setId}`);
+      logger.debug('SetDataManager: Using cached data', { componentId, setId });
       return setCardsData[setId];
     }
 
     // Use deduplication utility to prevent multiple concurrent requests
     return await deduplicatedFetch(setId, async () => {
-      console.log(`🚀 SetDataManager[${componentId}]: Executing fetch for set ${setId}`);
+      logger.debug('SetDataManager: Executing fetch', { componentId, setId });
       
       loadingSetData = { ...loadingSetData, [setId]: true };
       setDataErrors = { ...setDataErrors, [setId]: null };
@@ -87,12 +88,20 @@
 
         // Cache the data in memory only (Redis handles persistent caching)
         setCardsData = { ...setCardsData, [setId]: data };
-        console.log(`✅ SetDataManager[${componentId}]: Set data fetched for ${setId} (cached: ${data.cached ? 'yes' : 'no'})`);
+        logger.debug('SetDataManager: Set data fetched', { 
+          componentId, 
+          setId, 
+          cached: data.cached 
+        });
         
         dispatch('dataLoaded', { type: 'setData', setId });
         return data;
       } catch (err) {
-        console.error(`❌ SetDataManager[${componentId}]: Error fetching set ${setId} data:`, err);
+        logger.error('SetDataManager: Error fetching set data', { 
+          componentId, 
+          setId, 
+          error: err instanceof Error ? err.message : String(err) 
+        });
         setDataErrors = { ...setDataErrors, [setId]: err instanceof Error ? err.message : 'Failed to fetch set data' };
         throw err;
       } finally {
@@ -110,7 +119,7 @@
       
       // Check cache first
       if (missingCardsCache[cacheKey] && !skipListings) {
-        console.log(`✨ SetDataManager: Using cached missing cards for set ${setId}`);
+        logger.debug('SetDataManager: Using cached missing cards', { setId });
         return missingCardsCache[cacheKey];
       }
       
@@ -165,7 +174,10 @@
               }
             }
           } catch (err) {
-            console.error(`Error fetching listings for card ${card.id}:`, err);
+            logger.error('SetDataManager: Error fetching card listings', {
+              cardId: card.id,
+              error: err instanceof Error ? err.message : String(err)
+            });
           }
           
           return {
@@ -181,11 +193,17 @@
       
       // Cache the result
       missingCardsCache[cacheKey] = missingCardsWithListings;
-      console.log(`💾 SetDataManager: Cached ${missingCardsWithListings.length} missing cards for set ${setId}`);
+      logger.debug('SetDataManager: Cached missing cards', { 
+        setId, 
+        count: missingCardsWithListings.length 
+      });
       
       return missingCardsWithListings;
     } catch (err) {
-      console.error(`Error getting missing cards for set ${setId}:`, err);
+      logger.error('SetDataManager: Error getting missing cards', { 
+        setId, 
+        error: err instanceof Error ? err.message : String(err) 
+      });
       return [];
     }
   }
@@ -211,16 +229,16 @@
 
   // Function to fetch complete set data for all sets the user owns (moved from page)
   async function fetchAllUserSets() {
-    console.log(`📞 SetDataManager[${componentId}]: fetchAllUserSets() called`);
+    logger.debug('SetDataManager: fetchAllUserSets called', { componentId });
     
     // Only run on client-side to prevent SSR duplicate requests
     if (!browser) {
-      console.log(`🚫 SetDataManager[${componentId}]: Skipping fetchAllUserSets (SSR)`);
+      logger.debug('SetDataManager: Skipping fetchAllUserSets (SSR)', { componentId });
       return;
     }
     
     if (!extractedData?.profile?.digital_cards) {
-      console.log(`❌ SetDataManager[${componentId}]: No extractedData available, returning`);
+      logger.debug('SetDataManager: No extractedData available', { componentId });
       return;
     }
 
@@ -236,7 +254,10 @@
       }
     });
 
-    console.log(`🔄 SetDataManager[${componentId}]: Fetching complete set data for sets:`, Array.from(userSetIds));
+    logger.debug('SetDataManager: Fetching complete set data', { 
+      componentId, 
+      sets: Array.from(userSetIds) 
+    });
 
     // Fetch complete set data for each unique set
     const fetchPromises = Array.from(userSetIds).map(async (setId) => {
@@ -244,20 +265,25 @@
         await fetchCompleteSetData(setId);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-        console.error(`Failed to fetch complete set data for ${setId}:`, err);
+        logger.error('SetDataManager: Failed to fetch set data in bulk', {
+          setId,
+          error: err instanceof Error ? err.message : String(err)
+        });
         bulkFetchErrors = [...bulkFetchErrors, `Set ${setId}: ${errorMsg}`];
       }
     });
 
     await Promise.all(fetchPromises);
-    console.log('All set data fetching completed');
+    logger.debug('SetDataManager: All set data fetching completed');
     fetchingAllSets = false;
     dispatch('dataLoaded', { type: 'allSets' });
   }
 
   // Function to fetch missing cards with marketplace data (moved from page)
   async function fetchMissingCardsWithMarketplaceData(selectedSetValue: string, forceRefresh: boolean = false) {
-    console.log(`🎯 SetDataManager: fetchMissingCardsWithMarketplaceData called for set: ${selectedSetValue}`);
+    logger.debug('SetDataManager: fetchMissingCardsWithMarketplaceData called', { 
+      selectedSet: selectedSetValue 
+    });
     
     if (selectedSetValue === 'all') {
       missingCardsWithListings = [];
@@ -268,35 +294,41 @@
       getSetNameFromCard(card, setCardsData) === selectedSetValue
     ) || [];
     
-    console.log(`🎯 SetDataManager: Found ${userCardsForSet.length} user cards for set ${selectedSetValue}`);
+    logger.debug('SetDataManager: User cards found', { 
+      selectedSet: selectedSetValue, 
+      cardCount: userCardsForSet.length 
+    });
     
     const setId = userCardsForSet[0]?.card?.set_id;
     
     if (!setId) {
-      console.log(`❌ SetDataManager: No setId found for ${selectedSetValue}`);
+      logger.debug('SetDataManager: No setId found', { selectedSet: selectedSetValue });
       missingCardsWithListings = [];
       return;
     }
 
     // Check if we already have cached missing cards for this set
-    const userCardIds = new Set(userCardsForSet.map(card => card.card?.id).filter(Boolean));
+    const userCardIds = new Set(userCardsForSet.map((card: any) => card.card?.id).filter(Boolean));
     const cacheKey = `${setId}_${Array.from(userCardIds).sort().join(',')}`;
     
     if (!forceRefresh && missingCardsCache[cacheKey]) {
-      console.log(`🚀 SetDataManager: Using cached missing cards for instant display`);
+      logger.debug('SetDataManager: Using cached missing cards');
       missingCardsWithListings = missingCardsCache[cacheKey];
       return;
     }
 
-    console.log(`🎯 SetDataManager: Set ID is ${setId}`);
+    logger.debug('SetDataManager: Set ID identified', { setId });
 
     // Ensure we have the complete set data before checking for missing cards
     if (!setCardsData[setId]) {
-      console.log(`📥 SetDataManager: Fetching complete set data for ${setId} before checking missing cards`);
+      logger.debug('SetDataManager: Fetching complete set data before missing cards check', { setId });
       try {
         await fetchCompleteSetData(setId);
       } catch (err) {
-        console.error(`Failed to fetch complete set data for ${setId}:`, err);
+        logger.error('SetDataManager: Failed to fetch set data for missing cards', {
+          setId,
+          error: err instanceof Error ? err.message : String(err)
+        });
         missingCardsWithListings = [];
         return;
       }
@@ -306,9 +338,14 @@
     try {
       const result = await getMissingCards(setId, userCardsForSet);
       missingCardsWithListings = result;
-      console.log(`✅ SetDataManager: Got ${result.length} missing cards for set ${setId}`);
+      logger.debug('SetDataManager: Missing cards fetched', { 
+        setId, 
+        missingCount: result.length 
+      });
     } catch (err) {
-      console.error('Error fetching missing cards with marketplace data:', err);
+      logger.error('SetDataManager: Error fetching missing cards with marketplace data', { 
+        error: err instanceof Error ? err.message : String(err) 
+      });
       missingCardsWithListings = [];
     } finally {
       loadingMissingCards = false;
@@ -337,7 +374,10 @@
       // Check if set changed - if so, we might need to clear cache for a fresh fetch
       const setChanged = previousSelectedSet !== selectedSet;
       if (setChanged) {
-        console.log(`📍 SetDataManager: Set changed from ${previousSelectedSet} to ${selectedSet}`);
+        logger.debug('SetDataManager: Set selection changed', { 
+          from: previousSelectedSet, 
+          to: selectedSet 
+        });
         previousSelectedSet = selectedSet;
       }
       
@@ -356,7 +396,10 @@
   $effect(() => {
     // Only run on the client side to prevent SSR duplicate requests
     if (browser && extractedData?.profile?.digital_cards && !hasTriggeredInitialFetch) {
-      console.log(`🔄 SetDataManager[${componentId}]: Triggering initial fetch of all user sets (hasTriggeredInitialFetch was:`, hasTriggeredInitialFetch, ')');
+      logger.debug('SetDataManager: Triggering initial fetch', { 
+        componentId, 
+        hasTriggeredInitialFetch 
+      });
       hasTriggeredInitialFetch = true;
       fetchAllUserSets();
     }
@@ -369,16 +412,25 @@
     // Start with deduplicated user cards
     let cards = deduplicateCards([...extractedData.profile.digital_cards]);
     
-    console.log(`🔍 SetDataManager: combinedCards derived - selectedSet: ${selectedSet}, showMissingCards: ${showMissingCards}, onlyMissingCards: ${onlyMissingCards}, missingCardsWithListings.length: ${missingCardsWithListings.length}`);
+    logger.debug('SetDataManager: combinedCards derived', { 
+      selectedSet, 
+      showMissingCards, 
+      onlyMissingCards, 
+      missingCardsCount: missingCardsWithListings.length 
+    });
     
     // Add missing cards if enabled for specific set
     if (selectedSet !== 'all' && (showMissingCards || onlyMissingCards)) {
       if (onlyMissingCards) {
         cards = missingCardsWithListings;
-        console.log(`🔍 SetDataManager: Using only missing cards (${missingCardsWithListings.length} cards)`);
+        logger.debug('SetDataManager: Using only missing cards', { 
+          count: missingCardsWithListings.length 
+        });
       } else if (showMissingCards) {
         cards = [...cards, ...missingCardsWithListings];
-        console.log(`🔍 SetDataManager: Adding missing cards to user cards (${cards.length} total cards)`);
+        logger.debug('SetDataManager: Adding missing cards to collection', { 
+          totalCards: cards.length 
+        });
       }
     }
     
