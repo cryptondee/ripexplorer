@@ -24,6 +24,11 @@
       card_number: card?.card_number || card?.formatted_card_number,
       rarity: card?.rarity,
       
+      // Technical IDs
+      id: card?.id,
+      tokenId: card?.tokenId || rawCard?.token_id,
+      uniqueId: card?.uniqueId || rawCard?.unique_id,
+      
       // Images - handle different field names
       large_image_url: card?.large_image_url || card?.image_url || card?.small_image_url,
       small_image_url: card?.small_image_url || card?.image_url,
@@ -57,8 +62,18 @@
 </script>
 
 {#if $isCardModalOpen && $selectedCard}
-  <div class="modal-backdrop">
-    <div class="modal-lg">
+  <div 
+    class="modal-backdrop" 
+    role="dialog" 
+    aria-modal="true"
+    tabindex="-1"
+    onclick={closeCardModal}
+    onkeydown={(e) => e.key === 'Escape' && closeCardModal()}
+  >
+    <div 
+      class="modal-lg" 
+      onclick={(e) => e.stopPropagation()}
+    >
       <!-- Modal Header -->
       <div class="modal-header">
         <h3 class="modal-title">

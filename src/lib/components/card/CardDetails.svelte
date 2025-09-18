@@ -78,6 +78,31 @@
     </dl>
   </div>
   
+  <!-- Technical Details -->
+  <div class="bg-blue-50 p-4 rounded-lg">
+    <h4 class="font-semibold text-gray-900 mb-3">Technical Details</h4>
+    <dl class="space-y-2 text-sm">
+      {#if cardData?._fullCard?.card?.id || cardData?.id}
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Card ID:</dt>
+          <dd class="text-gray-900 font-mono text-xs">{cardData?._fullCard?.card?.id || cardData?.id || 'N/A'}</dd>
+        </div>
+      {/if}
+      {#if cardData?._fullCard?.token_id || cardData?.tokenId}
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Token ID:</dt>
+          <dd class="text-gray-900 font-mono text-xs">{cardData?._fullCard?.token_id || cardData?.tokenId || 'N/A'}</dd>
+        </div>
+      {/if}
+      {#if cardData?._fullCard?.unique_id || cardData?.uniqueId}
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Unique ID:</dt>
+          <dd class="text-gray-900 font-mono text-xs">{cardData?._fullCard?.unique_id || cardData?.uniqueId || 'N/A'}</dd>
+        </div>
+      {/if}
+    </dl>
+  </div>
+
   <!-- Special Features -->
   {#if cardData?.is_reverse || cardData?.is_holo || cardData?.is_first_edition || cardData?.is_shadowless || cardData?.is_unlimited || cardData?.is_promo}
     <div class="bg-purple-50 p-4 rounded-lg">
