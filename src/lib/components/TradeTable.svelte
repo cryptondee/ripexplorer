@@ -1,5 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { formatCurrency } from '$lib/utils/format';
+  import { theme } from '$lib/constants/theme';
   
   // Props for the reusable trade table component
   export let title: string;
@@ -77,13 +79,7 @@
   $: someSelected = enableSelection && sortedTrades.some(trade => selectedCards.has(trade.card.id));
   $: selectedCount = enableSelection ? sortedTrades.filter(trade => selectedCards.has(trade.card.id)).length : sortedTrades.length;
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
-  }
+  // formatCurrency imported from utils/format
 
   function getRowHighlighting(trade: any): string {
     // Highlight rows based on card count for both give and receive trades
@@ -96,20 +92,16 @@
 
   function getRowStyle(trade: any): string {
     const isSelected = enableSelection ? selectedCards.has(trade.card.id) : true;
+    const count = userCountField === 'userACount' ? trade.userACount : trade.userBCount;
     
-    // If card is deselected, gray it out
+    // Use theme constants for row styling
     if (enableSelection && !isSelected) {
-      return 'background-color: #f9fafb; color: #9ca3af; opacity: 0.6;';
+      return theme.tradeRow.getStyle(false, 0);
     }
     
     // Highlight rows based on card count for both give and receive trades
-    const count = userCountField === 'userACount' ? trade.userACount : trade.userBCount;
     if ((trade.tradeType === 'give' || trade.tradeType === 'receive' || trade.tradeType === 'perfect') && count > 0) {
-      if (count === 1) {
-        return 'background-color: #fed7aa; border-left: 4px solid #ea580c;'; // Single card - orange
-      } else {
-        return 'background-color: #bbf7d0; border-left: 4px solid #16a34a;'; // Multiple cards - green
-      }
+      return theme.tradeRow.getStyle(true, count);
     }
     return ''; // Default styling
   }
