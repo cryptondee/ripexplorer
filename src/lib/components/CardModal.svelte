@@ -123,7 +123,7 @@
           <div class="flex justify-center gap-2 overflow-x-auto pb-2">
             {#each $allCardsForModal as card, index}
               <button 
-                class="flex-shrink-0 w-16 h-20 border-2 {$selectedCardIndex === index ? 'border-blue-500' : 'border-gray-300'} rounded overflow-hidden hover:border-blue-400 transition-colors"
+                class="card-thumbnail {$selectedCardIndex === index ? 'card-thumbnail-selected' : 'card-thumbnail-unselected'}"
                 onclick={() => setSelectedCardIndex(index)}
               >
                 {#if card.card?.small_image_url}
@@ -167,7 +167,7 @@
           {#if cardData?.large_image_url}
             <div class="relative group">
               <button 
-                class="max-w-full h-auto rounded-lg shadow-md hover:shadow-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                class="card-detail-image"
                 onclick={() => window.open(cardData.large_image_url, '_blank')}
                 aria-label="Open full-size image in new tab"
               >
@@ -176,8 +176,8 @@
                   alt={cardData?.name} 
                   class="max-w-full h-auto rounded-lg"
                 />
-                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all flex items-center justify-center">
-                  <div class="opacity-0 group-hover:opacity-100 bg-white bg-opacity-90 px-3 py-1 rounded-full text-sm text-gray-800 transition-opacity">
+                <div class="card-overlay">
+                  <div class="card-overlay-content">
                     Click to enlarge
                   </div>
                 </div>
@@ -186,7 +186,7 @@
           {:else if cardData?.small_image_url}
             <div class="relative group">
               <button 
-                class="max-w-full h-auto rounded-lg shadow-md hover:shadow-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                class="card-detail-image"
                 onclick={() => window.open(cardData.small_image_url, '_blank')}
                 aria-label="Open image in new tab"
               >
@@ -195,8 +195,8 @@
                   alt={cardData?.name} 
                   class="max-w-full h-auto rounded-lg"
                 />
-                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all flex items-center justify-center">
-                  <div class="opacity-0 group-hover:opacity-100 bg-white bg-opacity-90 px-3 py-1 rounded-full text-sm text-gray-800 transition-opacity">
+                <div class="card-overlay">
+                  <div class="card-overlay-content">
                     Click to enlarge
                   </div>
                 </div>
@@ -233,7 +233,7 @@
               <div class="flex justify-between">
                 <dt class="text-gray-500">Foil:</dt>
                 <dd class="text-gray-900">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {getFoilType(cardData) === 'Normal' ? 'bg-gray-100 text-gray-800' : getFoilType(cardData) === 'Reverse Holo' ? 'bg-purple-100 text-purple-800' : 'bg-yellow-100 text-yellow-800'}">
+                  <span class="badge {getFoilType(cardData) === 'Normal' ? 'badge-neutral' : getFoilType(cardData) === 'Reverse Holo' ? 'badge-mythic' : 'badge-warning'}">
                     <span class="mr-1">{getFoilIcon(cardData)}</span>
                     {getFoilType(cardData)}
                   </span>
@@ -271,7 +271,7 @@
                   </span>
                 {/if}
                 {#if cardData?.is_holo}
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rainbow-100 text-rainbow-800 bg-gradient-to-r from-pink-100 to-blue-100">
+                  <span class="badge bg-gradient-to-r from-pink-100 to-blue-100 text-purple-800">
                     ✨ Holographic
                   </span>
                 {/if}
@@ -306,7 +306,7 @@
               <div class="flex justify-between">
                 <dt class="text-gray-500">Status:</dt>
                 <dd class="text-gray-900">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {$selectedCard.is_listed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                  <span class="badge-sm {$selectedCard.is_listed ? 'badge-success' : 'badge-neutral'}">
                     {$selectedCard.is_listed ? 'Listed' : 'Owned'}
                   </span>
                 </dd>
@@ -363,7 +363,7 @@
               href={buildRipCardUrl($selectedCard)}
               target="_blank"
               rel="noopener noreferrer"
-              class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              class="btn-primary-sm"
             >
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
@@ -372,7 +372,7 @@
             </a>
             <button
               onclick={closeCardModal}
-              class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+              class="btn-secondary-sm bg-gray-600 hover:bg-gray-700 text-white"
             >
               Close
             </button>
@@ -382,3 +382,10 @@
     </div>
   </div>
 {/if}
+
+<style>
+  @import './styles/buttons.css';
+  @import './styles/badges.css';
+  @import './styles/cards.css';
+  @import './styles/modals.css';
+</style>
