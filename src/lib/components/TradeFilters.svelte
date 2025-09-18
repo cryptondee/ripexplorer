@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { formatCurrency } from '$lib/utils/format';
 
   // Props
   export let selectedSet: string = 'all';
@@ -112,14 +113,7 @@
   $: selectedReceiveValue = selectedReceiveTrades.reduce((sum, trade) => sum + (trade.estimatedValue || 0), 0);
   $: tradeBalance = selectedReceiveValue - selectedGiveValue;
   
-  // Format currency helper
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
-  }
+  // formatCurrency imported from utils/format
 </script>
 
 <div class="bg-white rounded-lg shadow-md p-8 mb-8">
