@@ -203,7 +203,7 @@
       oninput={handleUserInput}
       onblur={hideSearchResults}
       {disabled}
-      class="block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+      class="search-input-with-icon"
       placeholder={placeholder}
       autocomplete="off"
       aria-label="Search for rip.fun user"
@@ -254,8 +254,13 @@
         </div>
       {/if}
     </div>
-  {/if}
-  
+{/if}
+
+<style>
+  @import './styles/forms.css';
+  @import './styles/buttons.css';
+</style>
+
   <!-- Hidden dummy input to prevent password manager activation -->
   <input type="text" style="position: absolute; left: -9999px;" tabindex="-1" aria-hidden="true" />
   
@@ -278,7 +283,7 @@
         <button
           onclick={triggerSync}
           disabled={syncLoading || disabled || (syncStatus?.rateLimited && syncStatus?.remainingMs > 0)}
-          class="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-secondary-sm"
           title={syncStatus?.rateLimited && syncStatus?.remainingMs > 0 
             ? `Rate limited. Next sync available in ${Math.ceil(syncStatus.remainingMs / (60 * 1000))} minutes`
             : "Sync blockchain data to update user database"}
