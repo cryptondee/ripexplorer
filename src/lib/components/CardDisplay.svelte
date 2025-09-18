@@ -4,6 +4,7 @@
   import CardTable from './CardTable.svelte';
   import { getSetNameFromCard } from '$lib/utils/card';
   import { getMarketValue, getListedPrice } from '$lib/utils/pricing';
+  import { logger } from '$lib/utils/logger';
   
   interface Props {
     extractedData: any;
@@ -124,7 +125,9 @@
     // Always use combinedCards as the source since it already includes missing cards when enabled
     let cards = combinedCards;
     
-    console.log(`📊 CardDisplay: Starting with ${combinedCards.length} combined cards`);
+    logger.debug('CardDisplay: Starting card filtering', { 
+      totalCards: combinedCards.length 
+    });
     
     // If a specific set is selected, filter to that set
     if (selectedSet !== 'all') {
@@ -132,7 +135,10 @@
         const setName = getSetNameFromCard(card, setCardsData);
         return setName === selectedSet;
       });
-      console.log(`📊 CardDisplay: After filtering to set "${selectedSet}", have ${cards.length} cards`);
+      logger.debug('CardDisplay: Filtered by set', { 
+        selectedSet, 
+        filteredCount: cards.length 
+      });
     }
     
     // Group cards by unique identifier to calculate quantities
