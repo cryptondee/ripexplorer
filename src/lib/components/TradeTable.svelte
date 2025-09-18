@@ -144,11 +144,11 @@
   </div>
   
   <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
+    <table class="table">
+      <thead class="table-header">
         <tr>
           {#if enableSelection}
-            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
+            <th scope="col" class="table-header-cell w-10">
               <input
                 type="checkbox"
                 class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
@@ -158,7 +158,7 @@
               />
             </th>
           {/if}
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('card')}>
+          <th scope="col" class="table-header-sortable" on:click={() => handleSort('card')}>
             <div class="flex items-center space-x-1">
               <span>Card</span>
               {#if sortColumn === 'card'}
@@ -166,7 +166,7 @@
               {/if}
             </div>
           </th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('set')}>
+          <th scope="col" class="table-header-sortable" on:click={() => handleSort('set')}>
             <div class="flex items-center space-x-1">
               <span>Set</span>
               {#if sortColumn === 'set'}
@@ -174,7 +174,7 @@
               {/if}
             </div>
           </th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('rarity')}>
+          <th scope="col" class="table-header-sortable" on:click={() => handleSort('rarity')}>
             <div class="flex items-center space-x-1">
               <span>Rarity</span>
               {#if sortColumn === 'rarity'}
@@ -182,7 +182,7 @@
               {/if}
             </div>
           </th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('count')}>
+          <th scope="col" class="table-header-sortable" on:click={() => handleSort('count')}>
             <div class="flex items-center space-x-1">
               <span>Count</span>
               {#if sortColumn === 'count'}
@@ -190,7 +190,7 @@
               {/if}
             </div>
           </th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => handleSort('value')}>
+          <th scope="col" class="table-header-sortable" on:click={() => handleSort('value')}>
             <div class="flex items-center space-x-1">
               <span>Value</span>
               {#if sortColumn === 'value'}
@@ -200,7 +200,7 @@
           </th>
         </tr>
       </thead>
-      <tbody class="bg-white divide-y divide-gray-200">
+      <tbody class="table-body">
         {#each sortedTrades as trade}
           <tr 
             class="{getRowHighlighting(trade)} cursor-pointer hover:bg-gray-50 transition-colors" 
@@ -254,7 +254,7 @@
             
             <!-- Rarity -->
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {getRarityBadgeClass(trade.card.rarity)}">
+              <span class="badge-sm {getRarityBadgeClass(trade.card.rarity)}">
                 {trade.card.rarity || 'Unknown'}
               </span>
             </td>
@@ -276,3 +276,8 @@
     </table>
   </div>
 </div>
+
+<style>
+  @import './styles/tables.css';
+  @import './styles/badges.css';
+</style>
