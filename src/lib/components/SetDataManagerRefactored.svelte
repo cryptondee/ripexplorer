@@ -53,8 +53,10 @@
   }>();
 
   // Computed: Cards organized by set
-  $: cardsBySet = extractedData?.profile?.digital_cards ? 
-    extractedData.profile.digital_cards.reduce((acc: any, userCard: any) => {
+  function getCardsBySet() {
+    if (!extractedData?.profile?.digital_cards) return {};
+    
+    return extractedData.profile.digital_cards.reduce((acc: any, userCard: any) => {
       const setId = userCard.card?.set_id;
       const setName = getSetNameFromCard(userCard);
       
@@ -70,10 +72,13 @@
       }
       
       return acc;
-    }, {}) : {};
+    }, {});
+  }
+  
+  let cardsBySet = $derived(getCardsBySet());
 
   // Computed: Combined cards (user cards + missing cards if enabled)
-  $: combinedCards = (() => {
+  function getCombinedCards() {
     if (!extractedData?.profile?.digital_cards) return [];
     
     let cards = [...extractedData.profile.digital_cards];
@@ -102,12 +107,16 @@
     }
     
     return cards;
-  })();
+  }
+  
+  let combinedCards = $derived(getCombinedCards());
 
   // Watch for combined cards changes and dispatch event
-  $: if (combinedCards) {
-    dispatch('combinedCardsChanged', combinedCards);
-  }
+  $effect(() => {
+    if (combinedCards) {
+      dispatch('combinedCardsChanged', combinedCards);
+    }
+  });
 
   // Expose functions from sub-components
   export async function fetchCompleteSetData(setId: string) {
