@@ -38,6 +38,7 @@
     clearFilters: void;
     cardSelectionToggle: boolean;
     copyTradeSummary: void;
+    SelectionToggle: boolean;
   }>();
 
   function handleSetChange() {
@@ -116,6 +117,11 @@
   // formatCurrency imported from utils/format
 </script>
 
+<style>
+  @import './styles/forms.css';
+  @import './styles/buttons.css';
+</style>
+
 <div class="bg-white rounded-lg shadow-md p-8 mb-8">
   <h2 class="text-xl font-bold mb-4">🔄 Trade Opportunities</h2>
   
@@ -142,7 +148,7 @@
     </label>
   </div>
   
-  <div class="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-8 bg-gray-50 p-6 rounded-lg">
+  <div class="filter-group">
     {#if !enableCrossSetTrading}
       <!-- Single Set Filter (Default) -->
       <div class="flex items-center space-x-2">
@@ -151,7 +157,7 @@
           id="setFilter" 
           bind:value={selectedSet}
           on:change={handleSetChange}
-          class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="select-sm"
         >
           <option value="all">All Sets</option>
           {#each sortedAvailableSets as set}
@@ -170,7 +176,7 @@
             id="setFilterA" 
             bind:value={selectedSetA}
             on:change={handleSetAChange}
-            class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1"
+            class="select-sm flex-1"
           >
             <option value="all">All Sets</option>
             {#each sortedAvailableSets as set}
@@ -187,7 +193,7 @@
             id="setFilterB" 
             bind:value={selectedSetB}
             on:change={handleSetBChange}
-            class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1"
+            class="select-sm flex-1"
           >
             <option value="all">All Sets</option>
             {#each sortedAvailableSets as set}
@@ -205,7 +211,7 @@
         id="rarityFilter" 
         bind:value={selectedRarity}
         on:change={handleRarityChange}
-        class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        class="select-sm"
       >
         <option value="all">All Rarities</option>
         {#each availableRarities as rarity}
@@ -231,7 +237,7 @@
     <button
       type="button"
       on:click={handleClearFilters}
-      class="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
+      class="btn-secondary-sm"
     >
       Clear Filters
     </button>
