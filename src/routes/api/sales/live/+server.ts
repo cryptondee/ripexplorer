@@ -1,5 +1,6 @@
 import type { RequestHandler } from './$types';
 import { salesMonitorService } from '$lib/server/services/index.js';
+import { logger } from '$lib/utils/logger.js';
 
 // TODO: Update EnrichedSalesEvent type to match new architecture
 type EnrichedSalesEvent = any;
@@ -17,7 +18,7 @@ export const GET: RequestHandler = async ({ request }) => {
   // Create a readable stream for SSE
   const stream = new ReadableStream({
     start(controller) {
-      console.log('🔗 Starting SSE stream for live sales');
+      logger.debug('SalesSSE: Starting SSE stream for live sales');
       
       // Track cleanup state
       let isClosed = false;
@@ -28,7 +29,7 @@ export const GET: RequestHandler = async ({ request }) => {
       const cleanup = () => {
         if (isClosed) return;
         isClosed = true;
-        console.log('🔌 Cleaning up SSE stream');
+        logger.debug('SalesSSE: Cleaning up SSE stream');
         
         if (keepAliveInterval) {
           clearInterval(keepAliveInterval);
@@ -39,7 +40,7 @@ export const GET: RequestHandler = async ({ request }) => {
           try {
             unsubscribe();
           } catch (error) {
-            console.warn('Error during unsubscribe:', error);
+            logger.warn('SalesSSE: Error during unsubscribe', { error });
           }
           unsubscribe = null;
         }
@@ -113,7 +114,7 @@ export const GET: RequestHandler = async ({ request }) => {
     },
     
     cancel() {
-      console.log('🔌 SSE stream cancelled by client');
+      logger.debug('SalesSSE: SSE stream cancelled by client');
     }
   });
 
