@@ -35,8 +35,12 @@ export const GET: RequestHandler = async ({ request }) => {
           keepAliveInterval = null;
         }
         
-        if (unsubscribe) {
-          unsubscribe();
+        if (unsubscribe && typeof unsubscribe === 'function') {
+          try {
+            unsubscribe();
+          } catch (error) {
+            console.warn('Error during unsubscribe:', error);
+          }
           unsubscribe = null;
         }
         
@@ -71,7 +75,7 @@ export const GET: RequestHandler = async ({ request }) => {
       }
 
       // Subscribe to sales events
-      unsubscribe = salesMonitorService.on('sale', (saleEvent: EnrichedSalesEvent) => {
+      const saleHandler = (saleEvent: EnrichedSalesEvent) => {
         if (isClosed) return;
         
         const eventData = {
@@ -80,7 +84,14 @@ export const GET: RequestHandler = async ({ request }) => {
         };
         
         safeEnqueue(`data: ${JSON.stringify(eventData)}\n\n`);
-      });
+      };
+      
+      salesMonitorService.on('sale', saleHandler);
+      
+      // Create unsubscribe function
+      unsubscribe = () => {
+        salesMonitorService.removeListener('sale', saleHandler);
+      };
 
       // Start keepalive interval (every 30 seconds)
       keepAliveInterval = setInterval(() => {
