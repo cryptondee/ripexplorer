@@ -51,5 +51,16 @@
 </div>
 
 <style>
-  @import '../styles/cards.css';
+  .card-detail-image {
+    @apply block cursor-pointer transition-transform hover:scale-105;
+  }
+  
+  .card-overlay {
+    @apply absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all;
+    @apply flex items-center justify-center opacity-0 hover:opacity-100;
+  }
+  
+  .card-overlay-content {
+    @apply text-white text-sm font-medium;
+  }
 </style>

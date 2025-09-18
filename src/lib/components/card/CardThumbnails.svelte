@@ -20,9 +20,9 @@
           class="card-thumbnail {$selectedCardIndex === index ? 'card-thumbnail-selected' : 'card-thumbnail-unselected'}"
           onclick={() => setSelectedCardIndex(index)}
         >
-          {#if card.card?.small_image_url}
+          {#if card.card?.small_image_url || card.card?.large_image_url}
             <img 
-              src={card.card.small_image_url} 
+              src={card.card?.small_image_url || card.card?.large_image_url} 
               alt={card.card?.name} 
               class="w-full h-full object-cover"
             />
@@ -56,5 +56,15 @@
 {/if}
 
 <style>
-  @import '../styles/cards.css';
+  .card-thumbnail {
+    @apply w-16 h-20 border-2 rounded cursor-pointer transition-all;
+  }
+  
+  .card-thumbnail-selected {
+    @apply border-blue-500 ring-2 ring-blue-200;
+  }
+  
+  .card-thumbnail-unselected {
+    @apply border-gray-300 hover:border-gray-400;
+  }
 </style>
