@@ -10,7 +10,7 @@ import type { RequestHandler } from './$types.js';
 const setCardKeyCache: Map<string, Set<string>> = new Map();
 
 async function getUserProfileForTrade(input: string, forceRefresh: boolean = false) {
-  console.log(`Extracting profile for: ${input}`);
+  logger.debug('TradeCompare: Extracting profile', { input });
   
   // Check cache first unless force refresh
   if (!forceRefresh) {
@@ -42,7 +42,10 @@ async function getUserProfileForTrade(input: string, forceRefresh: boolean = fal
     logger.warn('Failed to cache trade profile:', cacheError);
   }
   
-  console.log(`Profile extracted for ${extractData.username}: ${extractData.extractedData.profile?.digital_cards?.length || 0} cards`);
+  logger.debug('TradeCompare: Profile extracted', { 
+    username: extractData.username,
+    cardCount: extractData.extractedData.profile?.digital_cards?.length || 0
+  });
   
   return {
     username: extractData.username,
@@ -63,7 +66,10 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
     throw new Error('Cannot compare user with themselves');
   }
   
-  console.log(`Starting trade analysis between "${userA_input}" and "${userB_input}"`);
+  logger.debug('TradeCompare: Starting trade analysis', { 
+    userA: userA_input, 
+    userB: userB_input 
+  });
   
   // Extract both user profiles in parallel using direct function calls
   const [profileA, profileB] = await Promise.all([
@@ -71,9 +77,18 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
     getUserProfileForTrade(userB_input, forceRefresh)
   ]);
   
-  console.log(`Profile extraction complete:`);
-  console.log(`- ${profileA.username} (ID: ${profileA.id}): ${profileA.cards?.length || 0} cards`);
-  console.log(`- ${profileB.username} (ID: ${profileB.id}): ${profileB.cards?.length || 0} cards`);
+  logger.debug('TradeCompare: Profile extraction complete', {
+    userA: {
+      username: profileA.username,
+      id: profileA.id,
+      cardCount: profileA.cards?.length || 0
+    },
+    userB: {
+      username: profileB.username,
+      id: profileB.id,
+      cardCount: profileB.cards?.length || 0
+    }
+  });
   
   // Create user collections for trade analysis
   const collectionA = tradeAnalyzer.createUserCollection(
@@ -91,14 +106,16 @@ async function getTradeAnalysisForUsers(userA_input: string, userB_input: string
   );
   
   // Analyze trade opportunities
-  console.log('Analyzing trade opportunities...');
+  logger.debug('TradeCompare: Analyzing trade opportunities');
   const tradeAnalysis = tradeAnalyzer.analyzeTrades(collectionA, collectionB);
   
-  console.log(`Trade analysis complete:`);
-  console.log(`- Perfect trades: ${tradeAnalysis.summary.totalPerfectTrades}`);
-  console.log(`- ${collectionA.username} can receive: ${tradeAnalysis.summary.totalOneWayToA}`);
-  console.log(`- ${collectionA.username} can give: ${tradeAnalysis.summary.totalOneWayToB}`);
-  console.log(`- Impossible trades: ${tradeAnalysis.summary.totalImpossible}`);
+  logger.debug('TradeCompare: Trade analysis complete', {
+    perfectTrades: tradeAnalysis.summary.totalPerfectTrades,
+    userACanReceive: tradeAnalysis.summary.totalOneWayToA,
+    userACanGive: tradeAnalysis.summary.totalOneWayToB,
+    impossibleTrades: tradeAnalysis.summary.totalImpossible,
+    userA: collectionA.username
+  });
   
   // Build lightweight per-user owned counts by set (unique cards only)
   const ownedBySetA: Record<string, number> = {};
@@ -237,9 +254,9 @@ export const POST: RequestHandler = async ({ request }) => {
       try {
         const tradeCacheKey = `trade_compare:${userA}:${userB}`;
         await redisCache.set(tradeCacheKey, responseData, 1800);
-        console.log(`🔴 Cache STORED for trade analysis: ${userA} vs ${userB}`);
+        logger.debug('TradeCompare: Cache stored', { userA, userB });
       } catch (cacheError) {
-        console.warn('Failed to cache trade analysis:', cacheError);
+        logger.warn('TradeCompare: Failed to cache trade analysis', { error: cacheError });
       }
     }
     
