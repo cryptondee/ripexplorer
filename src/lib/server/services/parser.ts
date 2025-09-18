@@ -13,7 +13,17 @@ export async function extractFromRipFunAPI(userId: string): Promise<any> {
     const cardsUrl = EXTERNAL_URLS.RIP_FUN.API_USER_CARDS(userId);
     logger.api('GET', cardsUrl);
     
-    const cardsResponse = await fetch(cardsUrl);
+    const cardsResponse = await fetch(cardsUrl, {
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json'
+      }
+    }).catch(error => {
+      logger.error('Network error fetching from rip.fun:', { error: error.message });
+      throw new Error(`Network error: Unable to connect to rip.fun. Please check your internet connection and try again.`);
+    });
+    
     if (!cardsResponse.ok) {
       if (cardsResponse.status === 404) {
         throw new Error(`User ID '${userId}' not found`);
