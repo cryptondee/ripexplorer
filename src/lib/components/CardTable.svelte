@@ -72,14 +72,14 @@
   </p>
 </div>
 
-<div class="overflow-x-auto">
-  <table class="min-w-full divide-y divide-gray-200">
-    <thead class="bg-gray-50">
+<div class="table-container">
+  <table class="table">
+    <thead class="table-header">
       <tr>
         <!-- Card Column -->
         <th 
           scope="col" 
-          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          class="table-header-sortable"
           on:click={() => handleSort('name')}
           role="button"
           tabindex="0"
@@ -96,7 +96,7 @@
         <!-- Card Number Column -->
         <th 
           scope="col" 
-          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          class="table-header-sortable"
           on:click={() => handleSort('card_number')}
           role="button"
           tabindex="0"
@@ -113,7 +113,7 @@
         <!-- Quantity Column -->
         <th 
           scope="col" 
-          class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          class="table-header-sortable text-center"
           on:click={() => handleSort('quantity')}
           role="button"
           tabindex="0"
@@ -130,7 +130,7 @@
         <!-- Set Column -->
         <th 
           scope="col" 
-          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          class="table-header-sortable"
           on:click={() => handleSort('set')}
           role="button"
           tabindex="0"
@@ -147,7 +147,7 @@
         <!-- Rarity Column -->
         <th 
           scope="col" 
-          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          class="table-header-sortable"
           on:click={() => handleSort('rarity')}
           role="button"
           tabindex="0"
@@ -164,7 +164,7 @@
         <!-- Type Column -->
         <th 
           scope="col" 
-          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          class="table-header-sortable"
           on:click={() => handleSort('type')}
           role="button"
           tabindex="0"
@@ -181,7 +181,7 @@
         <!-- Value Column -->
         <th 
           scope="col" 
-          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          class="table-header-sortable"
           on:click={() => handleSort('value')}
           role="button"
           tabindex="0"
@@ -198,7 +198,7 @@
         <!-- Listed Price Column -->
         <th 
           scope="col" 
-          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+          class="table-header-sortable"
           on:click={() => handleSort('listedPrice')}
           role="button"
           tabindex="0"
@@ -213,22 +213,22 @@
         </th>
 
         <!-- Available Column -->
-        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <th scope="col" class="table-header-cell text-center">
           Available
         </th>
 
         <!-- Action Column -->
-        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <th scope="col" class="table-header-cell text-center">
           Action
         </th>
 
         <!-- Status Column -->
-        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        <th scope="col" class="table-header-cell">
           Status
         </th>
       </tr>
     </thead>
-    <tbody class="bg-white divide-y divide-gray-200">
+    <tbody class="table-body">
       {#each paginatedCards as card}
         <tr 
           class={getRowClass(card)}
@@ -386,6 +386,10 @@
     </tbody>
   </table>
 </div>
+
+<style>
+  @import './styles/tables.css';
+</style>
 
 {#if paginatedCards.length === 0}
   <div class="text-center py-12">
