@@ -42,13 +42,13 @@
       // Market info
       raw_price: card?.raw_price || card?.market_value,
       
-      // Special features
-      is_reverse: card?.is_reverse,
-      is_holo: card?.is_holo,
-      is_first_edition: card?.is_first_edition,
-      is_shadowless: card?.is_shadowless,
-      is_unlimited: card?.is_unlimited,
-      is_promo: card?.is_promo,
+      // Special features - handle different field names
+      is_reverse: card?.is_reverse || card?.reverse || card?.isReverse,
+      is_holo: card?.is_holo || card?.holo || card?.isHolo || card?.holographic,
+      is_first_edition: card?.is_first_edition || card?.first_edition || card?.isFirstEdition,
+      is_shadowless: card?.is_shadowless || card?.shadowless || card?.isShadowless,
+      is_unlimited: card?.is_unlimited || card?.unlimited || card?.isUnlimited,
+      is_promo: card?.is_promo || card?.promo || card?.isPromo,
       
       // Full card reference for utilities
       _fullCard: rawCard

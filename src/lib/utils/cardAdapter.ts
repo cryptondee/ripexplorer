@@ -21,6 +21,14 @@ export interface UniformCardData {
   small_image_url?: string;
   image?: string; // Fallback/primary image
   
+  // Foil/Special features
+  is_reverse?: boolean;
+  is_holo?: boolean;
+  is_first_edition?: boolean;
+  is_shadowless?: boolean;
+  is_unlimited?: boolean;
+  is_promo?: boolean;
+  
   // Source metadata
   source: 'extract' | 'trade' | 'sales';
   
@@ -61,6 +69,13 @@ export function adaptExtractCard(card: any): UniformCardData {
     large_image_url: card.card?.large_image_url,
     small_image_url: card.card?.small_image_url,
     image: card.card?.large_image_url || card.card?.small_image_url,
+    // Foil information
+    is_reverse: card.card?.is_reverse,
+    is_holo: card.card?.is_holo,
+    is_first_edition: card.card?.is_first_edition,
+    is_shadowless: card.card?.is_shadowless,
+    is_unlimited: card.card?.is_unlimited,
+    is_promo: card.card?.is_promo,
     source: 'extract',
     context: {
       listing: card.listing
@@ -85,6 +100,13 @@ export function adaptTradeCard(trade: any): UniformCardData {
     large_image_url: card?.large_image_url || card?.image_url,
     small_image_url: card?.small_image_url || card?.image_url,
     image: card?.large_image_url || card?.small_image_url || card?.image_url,
+    // Foil information with multiple field name variations
+    is_reverse: card?.is_reverse || card?.reverse || card?.isReverse,
+    is_holo: card?.is_holo || card?.holo || card?.isHolo || card?.holographic,
+    is_first_edition: card?.is_first_edition || card?.first_edition || card?.isFirstEdition,
+    is_shadowless: card?.is_shadowless || card?.shadowless || card?.isShadowless,
+    is_unlimited: card?.is_unlimited || card?.unlimited || card?.isUnlimited,
+    is_promo: card?.is_promo || card?.promo || card?.isPromo,
     source: 'trade',
     context: {
       tradeType: trade.tradeType,
@@ -163,6 +185,13 @@ export function toModalFormat(uniformCard: UniformCardData): any {
       set_id: uniformCard.set_id,
       large_image_url: uniformCard.large_image_url,
       small_image_url: uniformCard.small_image_url,
+      // Include foil information
+      is_reverse: uniformCard.is_reverse,
+      is_holo: uniformCard.is_holo,
+      is_first_edition: uniformCard.is_first_edition,
+      is_shadowless: uniformCard.is_shadowless,
+      is_unlimited: uniformCard.is_unlimited,
+      is_promo: uniformCard.is_promo,
       set: {
         name: uniformCard.set_name
       }
