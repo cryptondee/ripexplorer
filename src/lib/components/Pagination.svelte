@@ -80,7 +80,7 @@
       <button
         onclick={goToFirstPage}
         disabled={currentPage === 1}
-        class="px-3 py-1 text-sm border rounded-md {currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+        class="btn-pagination {currentPage === 1 ? '' : ''}"
       >
         First
       </button>
@@ -88,7 +88,7 @@
       <button
         onclick={previousPage}
         disabled={currentPage === 1}
-        class="px-3 py-1 text-sm border rounded-md {currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+        class="btn-pagination {currentPage === 1 ? '' : ''}"
       >
         Previous
       </button>
@@ -97,7 +97,7 @@
       {#each visiblePages as page}
         <button
           onclick={() => goToPage(page)}
-          class="px-3 py-1 text-sm border rounded-md {page === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+          class="btn-pagination {page === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : ''}"
         >
           {page}
         </button>
@@ -106,7 +106,7 @@
       <button
         onclick={nextPage}
         disabled={currentPage === totalPages}
-        class="px-3 py-1 text-sm border rounded-md {currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+        class="btn-pagination {currentPage === totalPages ? '' : ''}"
       >
         Next
       </button>
@@ -114,10 +114,14 @@
       <button
         onclick={goToLastPage}
         disabled={currentPage === totalPages}
-        class="px-3 py-1 text-sm border rounded-md {currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+        class="btn-pagination {currentPage === totalPages ? '' : ''}"
       >
         Last
       </button>
     </div>
   </div>
 {/if}
+
+<style>
+  @import './styles/buttons.css';
+</style>
