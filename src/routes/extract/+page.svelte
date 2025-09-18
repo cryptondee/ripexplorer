@@ -10,6 +10,9 @@
   import CollectionOverview from '$lib/components/CollectionOverview.svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   
+  // Import logger utility
+  import { logger } from '$lib/utils/logger';
+  
   // Import Svelte stores for centralized state management
   import { 
     ripUserId, extractedData, loading, error, extractionInfo,
@@ -26,7 +29,7 @@
   function clearAllSetCaches(): void {
     // Clear in-memory set cache (Redis handles persistent caching)
     setCardsData.set({});
-    console.log('Cleared in-memory set cache');
+    logger.debug('Extract: Cleared in-memory set cache');
   }
   
   // All state variables now imported from stores above
@@ -35,13 +38,13 @@
   // Event handlers for CardDisplay component
   function handleCardDisplaySort(event: CustomEvent) {
     const { column } = event.detail;
-    console.log('Sort changed:', column);
+    logger.debug('Extract: Sort changed', { column });
   }
   
   // Event handler for Pagination component
   function handlePageChanged(event: CustomEvent) {
     const { page, action } = event.detail;
-    console.log(`Page changed to ${page} via ${action}`);
+    logger.debug('Extract: Page changed', { page, action });
   }
   
   // Handle page size change
@@ -73,10 +76,10 @@
   // Event handlers for SetDataManager
   function handleSetDataLoaded(event: CustomEvent) {
     const { type, setId } = event.detail;
-    console.log(`Set data loaded: ${type}`, setId ? `for set ${setId}` : '');
+    logger.debug('Extract: Set data loaded', { type, setId });
     
     if (type === 'allSets') {
-      console.log('All user sets loaded successfully');
+      logger.debug('Extract: All user sets loaded successfully');
     }
   }
   
@@ -97,13 +100,13 @@
   // Event handlers for ExtractionActions component
   function handleExtractionComplete(event: CustomEvent) {
     const { data, info } = event.detail;
-    console.log('Extraction completed:', { data, info });
+    logger.debug('Extract: Extraction completed', { hasData: !!data, info });
     // Data is already bound to the stores via the component
   }
 
   function handleDataExported(event: CustomEvent) {
     const { type } = event.detail;
-    console.log(`Data exported via ${type}`);
+    logger.debug('Extract: Data exported', { type });
     // Could add toast notification here
   }
 
@@ -111,11 +114,11 @@
   function handleUserSelected(event: CustomEvent) {
     const { username } = event.detail;
     ripUserId.set(username);
-    console.log('User selected:', username);
+    logger.debug('Extract: User selected', { username });
   }
   
   function handleSyncComplete(event: CustomEvent) {
-    console.log('Sync completed:', event.detail);
+    logger.debug('Extract: Sync completed', { detail: event.detail });
   }
 </script>
 
