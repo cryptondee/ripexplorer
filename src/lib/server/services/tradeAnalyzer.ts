@@ -1,3 +1,5 @@
+import { logger } from '$lib/utils/logger.js';
+
 export interface TradeCard {
   id: string;
   name: string;
@@ -123,7 +125,11 @@ export class TradeAnalyzer {
       cardMap.set(key, standardCard);
     }
     
-    console.log(`Created card map: ${cards.length} input -> ${deduplicatedCards.length} deduplicated -> ${cardMap.size} final`);
+    logger.debug('TradeAnalyzer: Created card map', {
+      inputCards: cards.length,
+      deduplicatedCards: deduplicatedCards.length,
+      finalMapSize: cardMap.size
+    });
     return { cardMap, cardCounts };
   }
 
@@ -205,10 +211,19 @@ export class TradeAnalyzer {
     // Update missing cards for both users based on the universe
     this.updateMissingCards(userA, userB, cardUniverse);
     
-    console.log(`Trade analysis setup:`);
-    console.log(`- Card universe: ${cardUniverse.size} total unique cards`);
-    console.log(`- ${userA.username}: ${userA.ownedCards.size} owned, ${userA.missingCards.size} missing`);
-    console.log(`- ${userB.username}: ${userB.ownedCards.size} owned, ${userB.missingCards.size} missing`);
+    logger.debug('TradeAnalyzer: Trade analysis setup', {
+      cardUniverse: cardUniverse.size,
+      userA: {
+        username: userA.username,
+        owned: userA.ownedCards.size,
+        missing: userA.missingCards.size
+      },
+      userB: {
+        username: userB.username,
+        owned: userB.ownedCards.size,
+        missing: userB.missingCards.size
+      }
+    });
     const perfectTrades: TradeMatch[] = [];
     const userACanReceive: TradeMatch[] = [];
     const userACanGive: TradeMatch[] = [];
@@ -249,7 +264,12 @@ export class TradeAnalyzer {
 
       // Debug logging for first few cards
       if (perfectTrades.length + userACanReceive.length + userACanGive.length < 5) {
-        console.log(`Card ${card.name} (${cardKey}): A_has=${userAHas}, A_needs=${userANeeds}, B_has=${userBHas}, B_needs=${userBNeeds}`);
+        logger.debug('TradeAnalyzer: Card analysis', {
+          card: card.name,
+          key: cardKey,
+          userA: { has: userAHas, needs: userANeeds },
+          userB: { has: userBHas, needs: userBNeeds }
+        });
       }
 
       // Perfect trade: Both users have what the other needs
@@ -258,7 +278,7 @@ export class TradeAnalyzer {
           ...baseTradeMatch,
           tradeType: 'perfect'
         });
-        console.log(`✅ Perfect trade found: ${card.name}`);
+        logger.debug('TradeAnalyzer: Perfect trade found', { card: card.name });
       }
       // A can receive from B (A needs it, B has it)
       else if (userANeeds && userBHas) {
@@ -267,7 +287,10 @@ export class TradeAnalyzer {
           tradeType: 'receive'
         });
         if (userACanReceive.length <= 3) {
-          console.log(`⬅️ A can receive: ${card.name} (B has, A needs)`);
+          logger.debug('TradeAnalyzer: User A can receive', { 
+            card: card.name,
+            reason: 'B has, A needs'
+          });
         }
       }
       // A can give to B (A has it, B needs it)  
@@ -277,7 +300,10 @@ export class TradeAnalyzer {
           tradeType: 'give'
         });
         if (userACanGive.length <= 3) {
-          console.log(`➡️ A can give: ${card.name} (A has, B needs)`);
+          logger.debug('TradeAnalyzer: User A can give', {
+            card: card.name,
+            reason: 'A has, B needs'
+          });
         }
       }
       // Both missing (impossible trade)
