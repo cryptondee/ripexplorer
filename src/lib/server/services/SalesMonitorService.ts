@@ -18,6 +18,9 @@ import { tokenMetadataService } from './metadata/TokenMetadataService.js';
 import { cardEnrichmentEngine } from './enrichment/CardEnrichmentEngine.js';
 import { userDiscoveryService } from './users/UserDiscoveryService.js';
 
+// NEW: Unified enrichment service (testing migration)
+import { salesEnrichmentService } from './domain/SalesEnrichmentService.js';
+
 // Configuration
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const CONTRACT_ADDRESS = '0x4e4112dCd5eDA35648AFA851f611c79fCD26aF64';
@@ -261,8 +264,15 @@ export class SalesMonitorService extends EventEmitter {
       // Enrich card data if metadata is available
       let enrichedCardData = null;
       if (tokenMetadata) {
-        const isRichMetadata = tokenMetadataService.isRichMetadata(tokenMetadata);
-        enrichedCardData = await cardEnrichmentEngine.enrichCard(tokenMetadata, isRichMetadata);
+        // NEW: Use unified service if USE_NEW_ENRICHMENT env var is set
+        if (process.env.USE_NEW_ENRICHMENT === 'true') {
+          logger.debug('Using NEW unified enrichment service');
+          enrichedCardData = await salesEnrichmentService.enrichWithAutoDownload(tokenMetadata);
+        } else {
+          // Keep existing logic for safety
+          const isRichMetadata = tokenMetadataService.isRichMetadata(tokenMetadata);
+          enrichedCardData = await cardEnrichmentEngine.enrichCard(tokenMetadata, isRichMetadata);
+        }
       }
 
       // Store in database

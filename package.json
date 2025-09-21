@@ -20,7 +20,8 @@
 		"redis:stop": "docker-compose down redis",
 		"redis:logs": "docker-compose logs -f redis",
 		"cache:warm": "tsx scripts/warm-cache.ts",
-		"deploy:prepare": "npm run cache:warm"
+		"deploy:prepare": "npm run cache:warm",
+		"test:enrichment": "tsx src/lib/scripts/testEnrichmentMigration.ts"
 	},
 	"dependencies": {
 		"@prisma/client": "^5.22.0",

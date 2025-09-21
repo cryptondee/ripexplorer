@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { autoEnrichingSalesService } from '$lib/services/AutoEnrichingSalesService.js';
+// MIGRATED: Using new unified service instead of AutoEnrichingSalesService
+import { salesEnrichmentService } from '$lib/server/services/domain/SalesEnrichmentService.js';
 import { cardSyncService } from '$lib/services/CardSyncService.js';
 
 export const POST: RequestHandler = async () => {
@@ -10,8 +11,8 @@ export const POST: RequestHandler = async () => {
     // Get initial stats
     const initialStats = await cardSyncService.getSyncStats();
     
-    // Run the preload
-    await autoEnrichingSalesService.preloadPopularSets();
+    // Run the preload using NEW unified service
+    await salesEnrichmentService.preloadPopularSets();
     
     // Get final stats
     const finalStats = await cardSyncService.getSyncStats();
