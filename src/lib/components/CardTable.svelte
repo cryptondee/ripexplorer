@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import { buildRipCardUrl } from '$lib/utils/url';
   import { getSetNameFromCard } from '$lib/utils/card';
+  import { formatCurrency } from '$lib/utils/format';
 
   // Props
   export let paginatedCards: any[] = [];
@@ -52,10 +53,8 @@
   }
 
   function formatPrice(price: any): string {
-    if (typeof price === 'number') {
-      return price.toFixed(2);
-    }
-    return price || '—';
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return isNaN(numPrice) ? '0.00' : numPrice.toFixed(2);
   }
 
   function getSortIcon(column: string): string {
