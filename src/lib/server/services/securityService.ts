@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma as db } from '../db/client.js';
+import { logger } from '$lib/utils/logger.js';
 import type { SecureUserSession } from '@prisma/client';
 
 // Security configuration
@@ -53,7 +54,7 @@ export class SecurityService {
     try {
       return await bcrypt.compare(pin, hash);
     } catch (error) {
-      console.error('PIN verification error:', error);
+      logger.error('PIN verification error:', error);
       return false;
     }
   }
@@ -82,7 +83,7 @@ export class SecurityService {
       // Combine iv + authTag + encrypted data
       return `${iv.toString('hex')}:${authTag}:${encrypted}`;
     } catch (error) {
-      console.error('Encryption error:', error);
+      logger.error('Encryption error:', error);
       throw new Error('Failed to encrypt data');
     }
   }
@@ -106,7 +107,7 @@ export class SecurityService {
       
       return JSON.parse(decrypted);
     } catch (error) {
-      console.error('Decryption error:', error);
+      logger.error('Decryption error:', error);
       throw new Error('Failed to decrypt data');
     }
   }
@@ -135,7 +136,7 @@ export class SecurityService {
         username: payload.username
       };
     } catch (error) {
-      console.error('JWT verification error:', error);
+      logger.error('JWT verification error:', error);
       return null;
     }
   }
@@ -187,7 +188,7 @@ export class SecurityService {
       
       return { isLimited: false };
     } catch (error) {
-      console.error('Rate limit check error:', error);
+      logger.error('Rate limit check error:', error);
       return { isLimited: false };
     }
   }
@@ -221,7 +222,7 @@ export class SecurityService {
         }
       });
     } catch (error) {
-      console.error('Failed to record failed attempt:', error);
+      logger.error('Failed to record failed attempt:', error);
     }
   }
   
@@ -239,7 +240,7 @@ export class SecurityService {
         }
       });
     } catch (error) {
-      console.error('Failed to reset attempts:', error);
+      logger.error('Failed to reset attempts:', error);
     }
   }
   
@@ -297,8 +298,8 @@ export class SecurityService {
       };
       
     } catch (error) {
-      console.error('Session creation error:', error);
-      console.error('Error details:', {
+      logger.error('Session creation error:', error);
+      logger.error('Error details:', {
         name: error.name,
         message: error.message,
         stack: error.stack
@@ -381,7 +382,7 @@ export class SecurityService {
       };
       
     } catch (error) {
-      console.error('PIN validation error:', error);
+      logger.error('PIN validation error:', error);
       return {
         valid: false,
         error: 'Authentication failed'
@@ -438,7 +439,7 @@ export class SecurityService {
       };
       
     } catch (error) {
-      console.error('Session validation error:', error);
+      logger.error('Session validation error:', error);
       return {
         valid: false,
         error: 'Session validation failed'
@@ -466,7 +467,7 @@ export class SecurityService {
       
       return true;
     } catch (error) {
-      console.error('Session revocation error:', error);
+      logger.error('Session revocation error:', error);
       return false;
     }
   }
@@ -502,7 +503,7 @@ export class SecurityService {
         }
       });
       
-      console.log(`Session refreshed for user: ${session.claimedUsername}`);
+      logger.log(`Session refreshed for user: ${session.claimedUsername}`);
       
       return {
         success: true,
@@ -510,7 +511,7 @@ export class SecurityService {
       };
       
     } catch (error) {
-      console.error('Session refresh error:', error);
+      logger.error('Session refresh error:', error);
       return {
         success: false,
         error: 'Session refresh failed'

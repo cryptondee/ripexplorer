@@ -28,7 +28,7 @@ export class UserSyncService {
       try {
         checksumAddress = getAddress(address as `0x${string}`);
       } catch (error) {
-        logger.warn('Failed to convert to checksum address:', address, error);
+        logger.warn(`Invalid address found: ${address}`, error);
       }
       
       const apiUrl = EXTERNAL_URLS.RIP_FUN.API_AUTH(checksumAddress);
@@ -60,7 +60,7 @@ export class UserSyncService {
     usersUpdated: number;
     lastBlockNumber: number;
   }> {
-    console.log('Starting user sync from blockchain data...');
+    logger.log('Starting user sync from blockchain data...');
 
     // Get current sync status
     let syncStatus = await prisma.syncStatus.findUnique({
@@ -91,7 +91,7 @@ export class UserSyncService {
       
       // Fetch unique addresses from blockchain
       const addresses = await alchemyService.getUniqueBuyerAddresses(startBlock, 'latest');
-      console.log(`Processing ${addresses.length} unique addresses...`);
+      logger.log(`Processing ${addresses.length} unique addresses...`);
 
       let usersFound = 0;
       let usersUpdated = 0;
@@ -100,7 +100,7 @@ export class UserSyncService {
       // Process addresses in batches to avoid overwhelming APIs
       for (let i = 0; i < addresses.length; i += batchSize) {
         const batch = addresses.slice(i, i + batchSize);
-        console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(addresses.length / batchSize)}`);
+        logger.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(addresses.length / batchSize)}`);
 
         await Promise.all(batch.map(async (address) => {
           try {
@@ -185,7 +185,7 @@ export class UserSyncService {
         lastBlockNumber: latestBlockNumber
       };
 
-      console.log('User sync completed:', result);
+      logger.log('User sync completed:', result);
       return result;
 
     } catch (error) {
@@ -199,7 +199,7 @@ export class UserSyncService {
         }
       });
 
-      console.error('User sync failed:', error);
+      logger.error('User sync failed:', error);
       throw error;
     }
   }

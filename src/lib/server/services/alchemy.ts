@@ -2,6 +2,7 @@ import { Alchemy, Network } from 'alchemy-sdk';
 import { createPublicClient, http, parseAbiItem, getAddress, type PublicClient } from 'viem';
 import { base } from 'viem/chains';
 import { EXTERNAL_URLS } from '$lib/constants/urls.js';
+import { logger } from '$lib/utils/logger.js';
 
 // Configuration for Alchemy
 const config = {
@@ -45,7 +46,7 @@ export class AlchemyService {
       const latestBlock = toBlock === 'latest' ? await this.getLatestBlockNumber() : (toBlock || await this.getLatestBlockNumber());
       const startBlock = fromBlock || 0;
       
-      console.log(`Fetching NFT transfers from rip.fun contract from block ${startBlock} to ${latestBlock} with pagination...`);
+      logger.log(`Fetching NFT transfers from rip.fun contract from block ${startBlock} to ${latestBlock} with pagination...`);
 
       // Collect all transfers with pagination (Alchemy pageKey)
       let allTransfers: any[] = [];
@@ -65,7 +66,7 @@ export class AlchemyService {
       let pageCount = 0;
       do {
         pageCount++;
-        console.log(`Fetching page ${pageCount} of asset transfers...`);
+        logger.log(`Fetching page ${pageCount} of asset transfers...`);
 
         const params: any = { ...baseParams };
         if (pageKey) params.pageKey = pageKey;
@@ -77,15 +78,15 @@ export class AlchemyService {
 
         if (pageResult?.transfers) {
           allTransfers.push(...pageResult.transfers);
-          console.log(`Page ${pageCount}: Found ${pageResult.transfers.length} transfers (Total: ${allTransfers.length})`);
+          logger.log(`Page ${pageCount}: Found ${pageResult.transfers.length} transfers (Total: ${allTransfers.length})`);
         } else {
-          console.log(`Page ${pageCount}: No transfers found`);
+          logger.log(`Page ${pageCount}: No transfers found`);
         }
 
         pageKey = pageResult?.pageKey;
       } while (pageKey);
 
-      console.log(`Completed pagination: ${allTransfers.length} total transfers across ${pageCount} pages`);
+      logger.log(`Completed pagination: ${allTransfers.length} total transfers across ${pageCount} pages`);
 
       // Count transfers per recipient address
       const counts = new Map<string, number>();
@@ -98,15 +99,15 @@ export class AlchemyService {
           counts.set(checksum, (counts.get(checksum) || 0) + 1);
         } catch {
           // Invalid address, ignore
-          console.warn(`Invalid address found: ${to}`);
+          logger.warn(`Invalid address found: ${to}`);
         }
       }
 
-      console.log(`Found ${counts.size} unique recipient addresses`);
+      logger.log(`Found ${counts.size} unique recipient addresses`);
       return counts;
 
     } catch (error) {
-      console.error('Error fetching NFT recipients:', error);
+      logger.error('Error fetching NFT recipients:', error);
       throw new Error(`Failed to fetch NFT recipient data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -120,11 +121,11 @@ export class AlchemyService {
       const recipientCounts = await this.getRipFunNFTRecipients(fromBlock, toBlock);
       const addresses = Array.from(recipientCounts.keys());
       
-      console.log(`Returning ${addresses.length} unique buyer addresses from block range ${fromBlock || 0} to ${toBlock || 'latest'}`);
+      logger.log(`Returning ${addresses.length} unique buyer addresses from block range ${fromBlock || 0} to ${toBlock || 'latest'}`);
       return addresses;
       
     } catch (error) {
-      console.error('Error getting unique buyer addresses:', error);
+      logger.error('Error getting unique buyer addresses:', error);
       throw new Error(`Failed to fetch buyer addresses: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -137,7 +138,7 @@ export class AlchemyService {
       const blockNumber = await this.client.getBlockNumber();
       return Number(blockNumber);
     } catch (error) {
-      console.error('Error fetching latest block number:', error);
+      logger.error('Error fetching latest block number:', error);
       throw new Error(`Failed to fetch latest block: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -155,7 +156,7 @@ export class AlchemyService {
         .sort((a, b) => b.count - a.count); // Sort by count descending
         
     } catch (error) {
-      console.error('Error getting buyer addresses with counts:', error);
+      logger.error('Error getting buyer addresses with counts:', error);
       throw new Error(`Failed to fetch buyer address counts: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
