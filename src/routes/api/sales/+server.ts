@@ -3,7 +3,8 @@ import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db/client.js';
 import { salesMonitorService } from '$lib/server/services/index.js';
 import { CURRENCY_ADDRESSES, CURRENCY_DECIMALS } from '$lib/constants/sales';
-import { cardEnrichmentService } from '$lib/services/CardEnrichmentService.js';
+// MIGRATED: Using unified service instead of CardEnrichmentService
+import { salesEnrichmentService } from '$lib/server/services/domain/SalesEnrichmentService.js';
 
 // Helper function to parse timeframe
 function getTimeframeDate(timeframe: string): Date {
@@ -99,15 +100,15 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Enrich card data for uniform structure
     const enrichedSales = await Promise.all(sales.map(async (sale) => {
-      // Enrich card data to match extract/trade format
-      const enrichedCard = await cardEnrichmentService.enrichCardData({
+      // Enrich card data using unified service
+      const enrichedCard = await salesEnrichmentService.enrichSalesEvent({
         name: sale.cardName || undefined,
-        uniqueId: sale.cardUniqueId || undefined,
-        tokenId: sale.tokenId,
+        unique_id: sale.cardUniqueId || undefined,
         rarity: sale.cardRarity || undefined,
         set: sale.cardSet || undefined,
         image: sale.cardImage || undefined,
-        card_id: sale.cardId || undefined // Use the stored card_id from onchain metadata
+        card_id: sale.cardId || undefined,
+        attributes: [] // Empty attributes for historical data
       });
 
       return {
@@ -123,19 +124,19 @@ export const GET: RequestHandler = async ({ url }) => {
           username: sale.sellerUsername || undefined
         },
         card: enrichedCard ? {
-          // Enriched data (matches extract/trade format)
-          id: enrichedCard.id,
-          name: enrichedCard.name,
-          card_number: enrichedCard.card_number,
-          rarity: enrichedCard.rarity,
-          set_id: enrichedCard.set_id,
-          large_image_url: enrichedCard.large_image_url,
-          small_image_url: enrichedCard.small_image_url,
-          uniqueId: enrichedCard.uniqueId,
-          tokenId: enrichedCard.tokenId,
+          // Map enriched data to expected format
+          id: enrichedCard.cardId || sale.cardId,
+          name: enrichedCard.cardName,
+          card_number: enrichedCard.cardNumber || undefined,
+          rarity: enrichedCard.cardRarity,
+          set_id: enrichedCard.setId || undefined,
+          large_image_url: enrichedCard.largeImageUrl || enrichedCard.cardImage,
+          small_image_url: enrichedCard.smallImageUrl || enrichedCard.cardImage,
+          uniqueId: enrichedCard.cardUniqueId || sale.cardUniqueId,
+          tokenId: sale.tokenId,
           // Backward compatibility
-          image: enrichedCard.image,
-          set: enrichedCard.set_name
+          image: enrichedCard.cardImage,
+          set: enrichedCard.cardSet
         } : {
           // Fallback to original data
           name: sale.cardName || undefined,
