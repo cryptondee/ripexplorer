@@ -15,10 +15,9 @@ import type { SalesEvent } from '$lib/types/sales.js';
 
 // Specialized services
 import { tokenMetadataService } from './metadata/TokenMetadataService.js';
-import { cardEnrichmentEngine } from './enrichment/CardEnrichmentEngine.js';
 import { userDiscoveryService } from './users/UserDiscoveryService.js';
 
-// NEW: Unified enrichment service (testing migration)
+// MIGRATED: Using unified enrichment service
 import { salesEnrichmentService } from './domain/SalesEnrichmentService.js';
 
 // Configuration
@@ -264,15 +263,9 @@ export class SalesMonitorService extends EventEmitter {
       // Enrich card data if metadata is available
       let enrichedCardData = null;
       if (tokenMetadata) {
-        // NEW: Use unified service if USE_NEW_ENRICHMENT env var is set
-        if (process.env.USE_NEW_ENRICHMENT === 'true') {
-          logger.debug('Using NEW unified enrichment service');
-          enrichedCardData = await salesEnrichmentService.enrichWithAutoDownload(tokenMetadata);
-        } else {
-          // Keep existing logic for safety
-          const isRichMetadata = tokenMetadataService.isRichMetadata(tokenMetadata);
-          enrichedCardData = await cardEnrichmentEngine.enrichCard(tokenMetadata, isRichMetadata);
-        }
+        // MIGRATED: Always use unified service now
+        logger.debug('Using unified enrichment service');
+        enrichedCardData = await salesEnrichmentService.enrichWithAutoDownload(tokenMetadata);
       }
 
       // Store in database

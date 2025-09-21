@@ -5,8 +5,7 @@
  */
 
 import { salesEnrichmentService } from '../server/services/domain/SalesEnrichmentService.js';
-import { cardEnrichmentEngine } from '../server/services/enrichment/CardEnrichmentEngine.js';
-// REMOVED: AutoEnrichingSalesService - migrated to unified service
+// REMOVED: All old enrichment services - fully migrated to unified service
 
 // Test data matching real sales events
 const testCases = [
@@ -70,14 +69,10 @@ async function main() {
     console.log(`\n${testCase.name}:`);
     console.log('-'.repeat(40));
     
-    // Test new unified service vs old CardEngine
+    // Test unified service (old services removed)
     const results = await Promise.all([
-      testService('NEW Unified Service', 
+      testService('Unified Service', 
         (m: any) => salesEnrichmentService.enrichWithAutoDownload(m), 
-        testCase
-      ),
-      testService('OLD CardEngine', 
-        (m: any) => cardEnrichmentEngine.enrichCard(m, true), 
         testCase
       )
     ]);
