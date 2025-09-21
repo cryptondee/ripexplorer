@@ -3,10 +3,11 @@ import type { RequestHandler } from './$types';
 // MIGRATED: Using new unified service instead of AutoEnrichingSalesService
 import { salesEnrichmentService } from '$lib/server/services/domain/SalesEnrichmentService.js';
 import { cardSyncService } from '$lib/services/CardSyncService.js';
+import { logger } from '$lib/utils/logger.js';
 
 export const POST: RequestHandler = async () => {
   try {
-    console.log('🚀 Starting preload of popular sets via API...');
+    logger.log('🚀 Starting preload of popular sets via API...');
     
     // Get initial stats
     const initialStats = await cardSyncService.getSyncStats();
@@ -28,7 +29,7 @@ export const POST: RequestHandler = async () => {
       }
     });
   } catch (error) {
-    console.error('Preload error:', error);
+    logger.error('Preload error:', error);
     return json(
       {
         success: false,
@@ -56,7 +57,7 @@ export const GET: RequestHandler = async () => {
         : 'Good coverage for sales enrichment'
     });
   } catch (error) {
-    console.error('Error getting preload stats:', error);
+    logger.error('Error getting preload stats:', error);
     return json(
       {
         success: false,
