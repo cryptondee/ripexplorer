@@ -122,25 +122,11 @@ export interface TradeSummary {
 export type { 
   SalesEvent, 
   EnrichedSalesEvent, 
-  SalesFilter,
+  SalesFilters,
   SalesStats 
 } from './sales';
 
-// Authentication Types
-export interface AuthState {
-  isAuthenticated: boolean;
-  user?: User;
-  sessionToken?: string;
-  expiresAt?: Date;
-}
-
-export interface Session {
-  id: string;
-  userId: string;
-  token: string;
-  expiresAt: Date;
-  createdAt: Date;
-}
+// Authentication removed - no longer needed
 
 // API Response Types
 export interface ApiResponse<T = any> {
